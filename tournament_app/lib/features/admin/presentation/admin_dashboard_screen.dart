@@ -107,9 +107,34 @@ class _DashboardTab extends StatelessWidget {
           crossAxisSpacing: 12, mainAxisSpacing: 12, childAspectRatio: 1.8,
           children: [
             _QA(icon: Icons.add_circle_outline, label: 'New Tournament', onTap: () => context.go('/admin/tournament/create')),
-            _QA(icon: Icons.upload_outlined, label: 'Upload Photos', onTap: () {}),
-            _QA(icon: Icons.rule_outlined, label: 'Update Rules', onTap: () {}),
-            _QA(icon: Icons.live_tv_rounded, label: 'Go Live', onTap: () {}, accent: true),
+            _QA(
+              icon: Icons.upload_outlined,
+              label: 'Upload Photos',
+              onTap: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Photo upload feature coming soon')),
+                );
+              },
+            ),
+            _QA(
+              icon: Icons.rule_outlined,
+              label: 'Update Rules',
+              onTap: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Update rules feature coming soon')),
+                );
+              },
+            ),
+            _QA(
+              icon: Icons.live_tv_rounded,
+              label: 'Go Live',
+              onTap: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Go live feature coming soon')),
+                );
+              },
+              accent: true,
+            ),
           ],
         ),
       ]),

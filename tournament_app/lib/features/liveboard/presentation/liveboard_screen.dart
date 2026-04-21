@@ -49,7 +49,19 @@ class _LiveboardScreenState extends State<LiveboardScreen>
 
         if (state is LiveboardError) {
           return Scaffold(
-            appBar: AppBar(title: const Text('Live Board')),
+            appBar: AppBar(
+              title: const Text('Live Board'),
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back_ios_new_rounded),
+                onPressed: () {
+                  if (context.canPop()) {
+                    context.pop();
+                  } else {
+                    context.go('/home');
+                  }
+                },
+              ),
+            ),
             body: Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -88,6 +100,16 @@ class _LiveboardScreenState extends State<LiveboardScreen>
           return CreamScaffold(
             appBar: AppBar(
               title: Text('Live Board', style: AppTypography.titleLarge),
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back_ios_new_rounded),
+                onPressed: () {
+                  if (context.canPop()) {
+                    context.pop();
+                  } else {
+                    context.go('/home');
+                  }
+                },
+              ),
               actions: [
                 LiveBadge(activeCount: activeCount),
                 const SizedBox(width: 12),

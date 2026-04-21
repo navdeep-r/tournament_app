@@ -35,8 +35,8 @@ class TournamentModel {
   });
 
   bool get isLive => status == 'active';
-  bool get isUpcoming => status == 'upcoming';
-  bool get isCompleted => status == 'completed';
+  bool get isUpcoming => status == 'upcoming' || status == 'registration_open';
+  bool get isCompleted => status == 'completed' || status == 'cancelled';
   int get spotsLeft => maxParticipants - registeredCount;
   double get entryFeeRupees => entryFeePaise / 100;
   String get entryFeeFormatted => '₹${entryFeeRupees.toStringAsFixed(0)}';
@@ -46,16 +46,22 @@ class TournamentModel {
         id: json['id'] as String,
         name: json['name'] as String,
         description: json['description'] as String? ?? '',
-        bannerUrl: json['banner_url'] as String?,
-        startTime: DateTime.parse(json['start_time'] as String),
+        bannerUrl:
+            json['banner_url'] as String? ?? json['banner_image_url'] as String?,
+        startTime: DateTime.parse(
+            (json['start_time'] ?? json['starts_at']) as String),
         registrationDeadline: json['registration_deadline'] != null
             ? DateTime.parse(json['registration_deadline'] as String)
+            : json['registration_closes_at'] != null
+                ? DateTime.parse(json['registration_closes_at'] as String)
             : null,
-        maxParticipants: json['max_participants'] as int,
-        registeredCount: json['registered_count'] as int? ?? 0,
-        activeCount: json['active_count'] as int? ?? 0,
-        entryFeePaise: json['entry_fee_paise'] as int,
-        status: json['status'] as String,
+        maxParticipants: (json['max_participants'] as num).toInt(),
+        registeredCount: (json['registered_count'] as num?)?.toInt() ?? 0,
+        activeCount: (json['active_count'] as num?)?.toInt() ?? 0,
+        entryFeePaise: (json['entry_fee_paise'] as num).toInt(),
+        status: (json['status'] as String? ?? 'upcoming') == 'live'
+            ? 'active'
+            : (json['status'] as String? ?? 'upcoming'),
         rules: json['rules'] as String? ?? '',
         rounds: (json['rounds'] as List<dynamic>?)
                 ?.map((r) =>
@@ -91,7 +97,7 @@ class RoundSummary {
             ? DateTime.parse(json['scheduled_at'] as String)
             : null,
         status: json['status'] as String,
-        maxParticipants: json['max_participants'] as int,
+        maxParticipants: (json['max_participants'] as num?)?.toInt() ?? 0,
       );
 }
 
@@ -127,9 +133,12 @@ class ParticipationModel {
         id: json['id'] as String,
         tournamentId: json['tournament_id'] as String,
         tournamentName: json['tournament_name'] as String,
-        queueNumber: json['queue_number'] as int,
+        queueNumber: (json['queue_number'] as num).toInt(),
         status: json['status'] as String,
-        amountPaidPaise: json['amount_paid_paise'] as int,
+        amountPaidPaise:
+            (json['amount_paid_paise'] as num?)?.toInt() ??
+                (json['entry_fee_paise'] as num?)?.toInt() ??
+                0,
         paymentId: json['payment_id'] as String? ?? '',
         registeredAt: DateTime.parse(json['registered_at'] as String),
       );

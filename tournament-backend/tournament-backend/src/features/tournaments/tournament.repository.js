@@ -1,0 +1,87 @@
+class TournamentRepository {
+  constructor({ query, withTransaction }) {
+    this.query = query;
+    this.withTransaction = withTransaction;
+  }
+
+  async findById(id) {
+    const { rows } = await this.query(
+      `SELECT t.*, u.name AS winner_name
+       FROM tournaments t
+       LEFT JOIN users u ON u.id = t.winner_user_id
+       WHERE t.id = $1`,
+      [id]
+    );
+    return rows[0] || null;
+  }
+
+  async findAll({ status, search, page = 1, limit = 20 }) {
+    const conditions = [];
+    const values = [];
+    let idx = 1;
+
+    if (status) {
+      const statuses = Array.isArray(status) ? status : [status];
+      conditions.push(`t.status = ANY($${idx++})`);
+      values.push(statuses);
+    }
+    if (search) {
+      conditions.push(`t.name ILIKE $${idx++}`);
+      values.push(`%${search}%`);
+    }
+
+    const where = conditions.length ? 'WHERE ' + conditions.join(' AND ') : '';
+    const offset = (page - 1) * limit;
+
+    const countResult = await this.query(
+      `SELECT COUNT(*) FROM tournaments t ${where}`,
+      values
+    );
+    const total = parseInt(countResult.rows[0].count);
+
+    const { rows } = await this.query(
+      `SELECT t.*, u.name AS winner_name
+       FROM tournaments t
+       LEFT JOIN users u ON u.id = t.winner_user_id
+       ${where}
+       ORDER BY t.starts_at ASC
+       LIMIT $${idx++} OFFSET $${idx++}`,
+      [...values, limit, offset]
+    );
+
+    return { rows, total };
+  }
+
+  async create(data) {
+    const keys = Object.keys(data);
+    const cols = keys.join(', ');
+    const placeholders = keys.map((_, i) => `$${i + 1}`).join(', ');
+    const values = keys.map((k) => data[k]);
+    const { rows } = await this.query(
+      `INSERT INTO tournaments (${cols}) VALUES (${placeholders}) RETURNING *`,
+      values
+    );
+    return rows[0];
+  }
+
+  async update(id, fields) {
+    const keys = Object.keys(fields);
+    const setClause = keys.map((k, i) => `${k}=$${i + 2}`).join(', ');
+    const values = keys.map((k) => fields[k]);
+    const { rows } = await this.query(
+      `UPDATE tournaments SET ${setClause}, updated_at=NOW() WHERE id=$1 RETURNING *`,
+      [id, ...values]
+    );
+    return rows[0];
+  }
+
+  async getRoundsForTournament(tournamentId) {
+    const { rows } = await this.query(
+      'SELECT * FROM rounds WHERE tournament_id=$1 ORDER BY round_number ASC',
+      [tournamentId]
+    );
+    return rows;
+  }
+}
+
+module.exports = TournamentRepository;

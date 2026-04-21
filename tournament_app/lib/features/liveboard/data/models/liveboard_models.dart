@@ -24,15 +24,17 @@ class ParticipantModel {
     final statusStr = json['status'] as String? ?? 'active';
     final status = switch (statusStr) {
       'eliminated' => ParticipantStatus.eliminated,
+      'advanced' => ParticipantStatus.advancing,
       'advancing' => ParticipantStatus.advancing,
       'winner' => ParticipantStatus.winner,
+      'registered' => ParticipantStatus.active,
       _ => ParticipantStatus.active,
     };
     return ParticipantModel(
       id: json['id'] as String,
-      queueNumber: json['queue_number'] as int,
-      name: json['name'] as String,
-      photoUrl: json['photo_url'] as String?,
+      queueNumber: (json['queue_number'] as num).toInt(),
+      name: json['name'] as String? ?? 'Participant',
+      photoUrl: json['photo_url'] as String? ?? json['profile_image'] as String?,
       status: status,
       roundNumber: json['round_number'] as int? ?? 1,
       updatedAt: json['updated_at'] != null

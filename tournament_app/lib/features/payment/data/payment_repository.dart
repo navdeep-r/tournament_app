@@ -11,6 +11,18 @@ class PaymentRepository {
 
   PaymentRepository(this._api);
 
+  // 0. Send OTP to phone
+  Future<void> sendOtp({required String phone}) async {
+    try {
+      await _api.post(
+        ApiConstants.authPhoneSendOtp,
+        data: {'phone': phone},
+      );
+    } catch (e) {
+      throw Exception('Failed to send OTP: $e');
+    }
+  }
+
   // 1. Validate referral code
   Future<ReferralCode> validateReferralCode({
     required String code,
@@ -30,25 +42,50 @@ class PaymentRepository {
     throw Exception('Invalid referral code');
   }
 
-  // 2. Create Razorpay order on backend
+  // 2. Register user for tournament
+  Future<PaymentOrder> registerForTournament({
+    required String tournamentId,
+    required String userPhone,
+    String? referralCode,
+  }) async {
+    try {
+      final response = await _api.post(
+        ApiConstants.tournamentRegister(tournamentId),
+        data: {
+          'phone': userPhone,
+          'referral_code': referralCode,
+        },
+      );
+
+      final data = response.data;
+      return PaymentOrder(
+        orderId: data['order_id'],
+        tournamentId: tournamentId,
+        tournamentName: data['tournament_name'],
+        amountPaise: data['amount_paise'],
+        originalAmountPaise: data['original_amount_paise'],
+        discountPaise: data['discount_paise'] ?? 0,
+        currency: 'INR',
+        receipt: data['receipt'],
+        userPhone: userPhone,
+        expiresAt: DateTime.parse(data['expires_at']),
+        status: data['status'],
+      );
+    } catch (e) {
+      throw Exception('Failed to register: $e');
+    }
+  }
+
+  // Legacy method for compatibility
   Future<PaymentOrder> createPaymentOrder({
     required String tournamentId,
     required String userPhone,
     String? referralCode,
   }) async {
-    await Future.delayed(const Duration(milliseconds: 500));
-    return PaymentOrder(
-      orderId: 'order_dummy_${DateTime.now().millisecondsSinceEpoch}',
+    return registerForTournament(
       tournamentId: tournamentId,
-      tournamentName: 'Dummy Tournament',
-      amountPaise: 10000,
-      originalAmountPaise: 10000,
-      discountPaise: 0,
-      currency: 'INR',
-      receipt: 'rcpt_dummy',
       userPhone: userPhone,
-      expiresAt: DateTime.now().add(const Duration(minutes: 15)),
-      status: 'created',
+      referralCode: referralCode,
     );
   }
 
@@ -59,17 +96,31 @@ class PaymentRepository {
     required String razorpaySignature,
     required String userPhone,
   }) async {
-    await Future.delayed(const Duration(milliseconds: 500));
-    return PaymentSuccess(
-      razorpayPaymentId: razorpayPaymentId,
-      razorpayOrderId: razorpayOrderId,
-      razorpaySignature: razorpaySignature,
-      userPhone: userPhone,
-      amountPaisePaid: 10000,
-      tournamentId: 't_dummy',
-      queueNumber: 42,
-      paidAt: DateTime.now(),
-    );
+    try {
+      final response = await _api.post(
+        '/payments/verify',
+        data: {
+          'razorpay_payment_id': razorpayPaymentId,
+          'razorpay_order_id': razorpayOrderId,
+          'razorpay_signature': razorpaySignature,
+          'phone': userPhone,
+        },
+      );
+
+      final data = response.data;
+      return PaymentSuccess(
+        razorpayPaymentId: data['razorpay_payment_id'],
+        razorpayOrderId: data['razorpay_order_id'],
+        razorpaySignature: data['razorpay_signature'],
+        userPhone: data['phone'],
+        amountPaisePaid: data['amount_paid_paise'],
+        tournamentId: data['tournament_id'],
+        queueNumber: data['queue_number'],
+        paidAt: DateTime.parse(data['paid_at']),
+      );
+    } catch (e) {
+      throw Exception('Payment verification failed: $e');
+    }
   }
 
   // 4. Poll order status (for UPI intent return)

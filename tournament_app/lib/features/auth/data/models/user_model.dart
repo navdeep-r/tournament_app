@@ -22,11 +22,13 @@ class UserModel {
 
   factory UserModel.fromJson(Map<String, dynamic> json) => UserModel(
         id: json['id'] as String,
-        name: json['name'] as String,
-        email: json['email'] as String,
-        photoUrl: json['photo_url'] as String?,
+        name: json['name'] as String? ?? 'Player',
+        email: json['email'] as String? ?? '',
+        photoUrl: json['photo_url'] as String? ?? json['profile_image'] as String?,
         role: json['role'] as String? ?? 'user',
-        createdAt: DateTime.parse(json['created_at'] as String),
+        createdAt: json['created_at'] != null
+            ? DateTime.parse(json['created_at'] as String)
+            : DateTime.now(),
       );
 
   Map<String, dynamic> toJson() => {

@@ -117,7 +117,7 @@ class _PaymentSuccessScreenState extends State<PaymentSuccessScreen>
                   GoldButton(
                     label: 'View Live Board',
                     onPressed: () =>
-                        context.go('/liveboard/$tournamentId'),
+                        context.push('/liveboard/$tournamentId'),
                   ),
                   const SizedBox(height: 12),
                   GoldButton(
@@ -260,7 +260,7 @@ class PaymentFailureScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 12),
                   TextButton(
-                    onPressed: () {},
+                    onPressed: () => context.go('/home'),
                     child: Text('Contact Support',
                         style: AppTypography.labelMedium
                             .copyWith(color: AppColors.textSecondary)),

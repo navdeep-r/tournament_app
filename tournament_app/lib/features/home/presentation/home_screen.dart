@@ -41,7 +41,11 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(width: 8),
           IconButton(
             icon: const Icon(Icons.notifications_none_rounded),
-            onPressed: () {},
+            onPressed: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('No notifications yet')),
+              );
+            },
           ),
         ],
       ),
@@ -49,8 +53,17 @@ class _HomeScreenState extends State<HomeScreen> {
         currentIndex: _currentTab,
         onTap: (i) {
           setState(() => _currentTab = i);
-          if (i == 1) context.go('/liveboard/active');
-          if (i == 2) context.go('/profile');
+          if (i == 1) {
+            final state = context.read<HomeBloc>().state;
+            if (state is HomeLoaded && state.activeToday.isNotEmpty) {
+              context.push('/liveboard/${state.activeToday.first.id}');
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('No active tournament live right now')),
+              );
+            }
+          }
+          if (i == 2) context.push('/profile');
         },
         items: const [
           BottomNavigationBarItem(
@@ -104,9 +117,9 @@ class _HomeScreenState extends State<HomeScreen> {
                     tournament: t,
                     isRegistered: false,
                     onViewBoard: () =>
-                        context.go('/liveboard/${t.id}'),
+                        context.push('/liveboard/${t.id}'),
                     onRegister: () =>
-                        context.go('/tournament/${t.id}/checkout'),
+                        context.push('/tournament/${t.id}/checkout'),
                   ),
                 )),
             const SizedBox(height: 8),
@@ -126,7 +139,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   tournament: state.upcoming[i],
                   isRegistered: false,
                   onJoin: () => context
-                      .go('/tournament/${state.upcoming[i].id}/checkout'),
+                      .push('/tournament/${state.upcoming[i].id}/checkout'),
                   onTap: () => context
                       .go('/tournament/${state.upcoming[i].id}'),
                 ),
@@ -149,7 +162,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   tournament: state.tomorrow[i],
                   isRegistered: false,
                   onJoin: () => context
-                      .go('/tournament/${state.tomorrow[i].id}/checkout'),
+                      .push('/tournament/${state.tomorrow[i].id}/checkout'),
                   onTap: () => context
                       .go('/tournament/${state.tomorrow[i].id}'),
                 ),

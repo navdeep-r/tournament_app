@@ -78,7 +78,13 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
                   child: const Icon(Icons.arrow_back_ios_new_rounded,
                       color: Colors.white, size: 16),
                 ),
-                onPressed: () => context.pop(),
+                onPressed: () {
+                   if (context.canPop()) {
+                     context.pop();
+                   } else {
+                     context.go('/home');
+                   }
+                 },
               ),
               actions: [
                 if (t.isLive)
@@ -230,7 +236,7 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
                       tournament: t,
                       isRegistered: state.isRegistered,
                       onRegister: () =>
-                          context.go('/tournament/${t.id}/checkout'),
+                          context.push('/tournament/${t.id}/checkout'),
                     ),
                     const SizedBox(height: 32),
                   ],
@@ -240,7 +246,7 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
                       child: ElevatedButton.icon(
-                        onPressed: () => context.go('/liveboard/${t.id}'),
+                        onPressed: () => context.push('/liveboard/${t.id}'),
                         icon: const Icon(Icons.live_tv_rounded),
                         label: const Text('View Live Board'),
                         style: ElevatedButton.styleFrom(

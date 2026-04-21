@@ -6,123 +6,109 @@ class TournamentRepository {
   final ApiClient _api;
   TournamentRepository(this._api);
 
-  final _dummyTournaments = <TournamentModel>[
-    TournamentModel(
-      id: 't_1',
-      name: 'BGMI Pro League Season 4',
-      description: 'The ultimate showdown for BGMI pro players. Show off your skills and win the prize pool!',
-      bannerUrl: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80',
-      startTime: DateTime.now().add(const Duration(hours: 2)),
-      registrationDeadline: DateTime.now().add(const Duration(hours: 1)),
-      maxParticipants: 100,
-      registeredCount: 85,
-      activeCount: 85,
-      entryFeePaise: 5000,
-      status: 'upcoming',
-      rules: '1. No hacking or third-party apps.\n2. Fair play is strictly monitored.\n3. Disconnects within 5 mins can be appealed.',
-      rounds: const [
-        RoundSummary(id: 'r1', name: 'Qualifiers', status: 'pending', maxParticipants: 100),
-      ],
-      photoUrls: const [
-        'https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=400&q=80',
-      ],
-    ),
-    TournamentModel(
-      id: 't_2',
-      name: 'Free Fire Clash Squad',
-      description: 'Intense 4v4 action. Grab your squad and dominate the battlefield.',
-      bannerUrl: 'https://images.unsplash.com/photo-1605901309584-818e25960b8f?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80',
-      startTime: DateTime.now().subtract(const Duration(hours: 1)),
-      maxParticipants: 50,
-      registeredCount: 50,
-      activeCount: 40,
-      entryFeePaise: 0,
-      status: 'active',
-      rules: 'Standard Clash Squad rules. Auto-aim allowed. No emulators.',
-      rounds: const [
-        RoundSummary(id: 'r1', name: 'Quarter Finals', status: 'active', maxParticipants: 50),
-      ],
-      photoUrls: const [],
-    ),
-    TournamentModel(
-      id: 't_3',
-      name: 'Valorant Community Cup',
-      description: '5v5 tactical shooter community tournament.',
-      bannerUrl: 'https://images.unsplash.com/photo-1563986768494-4dee2763ff3f?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80',
-      startTime: DateTime.now().add(const Duration(days: 1)),
-      maxParticipants: 32,
-      registeredCount: 15,
-      activeCount: 15,
-      entryFeePaise: 10000,
-      status: 'upcoming',
-      rules: 'Current patch. All maps in rotation. BO1 until finals.',
-      rounds: const [
-        RoundSummary(id: 'r1', name: 'Group Stage', status: 'pending', maxParticipants: 32),
-      ],
-      photoUrls: const [],
-    ),
-    TournamentModel(
-      id: 't_4',
-      name: 'Global Chess Open',
-      description: 'Rapid chess tournament open to all ratings.',
-      bannerUrl: 'https://images.unsplash.com/photo-1529699211952-734e80c4d42b?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80',
-      startTime: DateTime.now().add(const Duration(days: 2)),
-      maxParticipants: 200,
-      registeredCount: 198,
-      activeCount: 198,
-      entryFeePaise: 2500,
-      status: 'upcoming',
-      rules: '10+0 Rapid format. Lichess rules apply. No engine assistance.',
-      rounds: const [
-        RoundSummary(id: 'r1', name: 'Swiss Round 1', status: 'pending', maxParticipants: 200),
-      ],
-      photoUrls: const [],
-    ),
-  ];
+  /// Fetch list of tournaments (with optional filtering)
+  Future<List<TournamentModel>> getTournaments({
+    String? status, // 'active', 'upcoming', etc.
+    List<String>? statuses,
+  }) async {
+    try {
+      final response = await _api.get(
+        ApiConstants.tournaments,
+        queryParameters: statuses != null && statuses.isNotEmpty
+            ? {'status': statuses}
+            : status != null
+                ? {'status': status}
+                : null,
+      );
 
+      final payload = response.data['data'] as List<dynamic>;
+      final tournaments = payload
+          .map((t) => TournamentModel.fromJson(t))
+          .toList();
+      return tournaments;
+    } catch (e) {
+      throw Exception('Failed to fetch tournaments: $e');
+    }
+  }
+
+  /// Fetch today's active tournaments
   Future<List<TournamentModel>> getTodayActive() async {
-    await Future.delayed(const Duration(milliseconds: 800));
-    return _dummyTournaments.where((t) => t.isLive).toList();
+    return getTournaments(status: 'live');
   }
 
+  /// Fetch upcoming tournaments
   Future<List<TournamentModel>> getUpcoming() async {
-    await Future.delayed(const Duration(milliseconds: 800));
-    return _dummyTournaments.where((t) => t.isUpcoming).toList();
+    final tournaments = await getTournaments();
+    return tournaments
+        .where((t) => t.status == 'upcoming' || t.status == 'registration_open')
+        .toList();
   }
 
+  /// Fetch tomorrow's tournaments (optional - backend may not support this)
   Future<List<TournamentModel>> getTomorrow() async {
-    await Future.delayed(const Duration(milliseconds: 800));
-    return _dummyTournaments.where((t) => t.startTime.isAfter(DateTime.now().add(const Duration(days: 1)))).toList();
+    try {
+      final response = await _api.get(
+        ApiConstants.tournaments,
+      );
+      final payload = response.data['data'] as List<dynamic>;
+      final tournaments = payload
+          .map((t) => TournamentModel.fromJson(t))
+          .where((t) => t.status == 'upcoming' || t.status == 'registration_open')
+          .toList();
+      
+      // Filter for tomorrow's start times if needed
+      final now = DateTime.now();
+      final tomorrow = now.add(const Duration(days: 1));
+      return tournaments.where((t) => 
+        t.startTime.year == tomorrow.year &&
+        t.startTime.month == tomorrow.month &&
+        t.startTime.day == tomorrow.day
+      ).toList();
+    } catch (e) {
+      return getTournaments(); // Fallback to all tournaments
+    }
   }
 
+  /// Fetch user's participation history
   Future<List<ParticipationModel>> getUserHistory() async {
-    await Future.delayed(const Duration(milliseconds: 800));
-    return [
-      ParticipationModel(
-        id: 'p1',
-        tournamentId: 't_2',
-        tournamentName: 'Free Fire Clash Squad',
-        queueNumber: 15,
-        status: 'active',
-        amountPaidPaise: 0,
-        paymentId: 'pay_xyz',
-        registeredAt: DateTime.now().subtract(const Duration(days: 1)),
-      ),
-      ParticipationModel(
-        id: 'p2',
-        tournamentId: 't_1',
-        tournamentName: 'BGMI Pro League Season 4',
-        queueNumber: 42,
-        status: 'eliminated',
-        amountPaidPaise: 5000,
-        paymentId: 'pay_abc',
-        registeredAt: DateTime.now().subtract(const Duration(days: 3)),
-      ),
-    ];
+    try {
+      final response = await _api.get(ApiConstants.participantsMy);
+
+      final payload = response.data['data'] as List<dynamic>;
+      final participations = payload
+          .map((p) => ParticipationModel.fromJson(p))
+          .toList();
+      return participations;
+    } catch (e) {
+      throw Exception('Failed to fetch participation history: $e');
+    }
   }
 
+  /// Fetch single tournament by ID
   Future<TournamentModel> getById(String id) async {
-    await Future.delayed(const Duration(milliseconds: 500));
-    return _dummyTournaments.firstWhere((t) => t.id == id, orElse: () => _dummyTournaments.first);
+    try {
+      final response = await _api.get(ApiConstants.tournamentById(id));
+      final payload = response.data['data'] as Map<String, dynamic>;
+      return TournamentModel.fromJson(payload);
+    } catch (e) {
+      throw Exception('Failed to fetch tournament: $e');
+    }
+  }
+
+  /// Fetch rounds for a tournament
+  Future<List<RoundSummary>> getRounds(String tournamentId) async {
+    try {
+      final response = await _api.get(
+        ApiConstants.tournamentRounds(tournamentId),
+      );
+
+      final payload = response.data['data'] as List<dynamic>;
+      final rounds = payload
+          .map((r) => RoundSummary.fromJson(r))
+          .toList();
+      return rounds;
+    } catch (e) {
+      throw Exception('Failed to fetch rounds: $e');
+    }
   }
 }

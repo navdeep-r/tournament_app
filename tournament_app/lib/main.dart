@@ -12,6 +12,7 @@ import 'package:tournament_app/features/home/bloc/home_bloc.dart';
 import 'package:tournament_app/features/home/data/tournament_repository.dart';
 import 'package:tournament_app/features/home/presentation/home_screen.dart';
 import 'package:tournament_app/features/liveboard/bloc/liveboard_bloc.dart';
+import 'package:tournament_app/features/liveboard/data/liveboard_repository.dart';
 import 'package:tournament_app/features/liveboard/presentation/liveboard_screen.dart';
 import 'package:tournament_app/features/tournament_detail/bloc/tournament_detail_bloc.dart';
 import 'package:tournament_app/features/tournament_detail/presentation/tournament_detail_screen.dart';
@@ -26,6 +27,7 @@ import 'package:tournament_app/features/profile/presentation/profile_screen.dart
 final _api = ApiClient();
 final _tournamentRepo = TournamentRepository(_api);
 final _paymentRepo = PaymentRepository(_api);
+final _liveboardRepo = LiveboardRepository(_api);
 
 final _router = GoRouter(
   initialLocation: '/login',
@@ -76,7 +78,7 @@ final _router = GoRouter(
       builder: (_, state) {
         final id = state.pathParameters['id']!;
         return BlocProvider(
-          create: (_) => LiveboardBloc(),
+          create: (_) => LiveboardBloc(_liveboardRepo),
           child: LiveboardScreen(tournamentId: id),
         );
       },
@@ -92,7 +94,7 @@ final _router = GoRouter(
       builder: (_, state) {
         final id = state.pathParameters['id']!;
         return BlocProvider(
-          create: (_) => LiveboardBloc(),
+          create: (_) => LiveboardBloc(_liveboardRepo),
           child: LiveboardScreen(tournamentId: id),
         );
       },

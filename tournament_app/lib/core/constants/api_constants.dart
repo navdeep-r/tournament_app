@@ -1,43 +1,40 @@
 abstract class ApiConstants {
-  static const String baseUrl = 'https://api.tournamenthub.com/v1';
+  // Base URL - Update this based on your deployment
+  // Local development: 'http://localhost:3000/api'
+  // Production: 'https://your-backend-domain.com/api'
+  static const String baseUrl = 'http://localhost:3000/api';
 
   // Auth
   static const String authGoogle = '/auth/google';
   static const String authRefresh = '/auth/refresh';
   static const String authPhoneSendOtp = '/auth/phone/send-otp';
   static const String authPhoneVerifyOtp = '/auth/phone/verify-otp';
+  static const String authLogout = '/auth/logout';
+  static const String authMe = '/auth/me';
 
   // Tournaments
   static const String tournaments = '/tournaments';
   static String tournamentById(String id) => '/tournaments/$id';
-  static const String tournamentsTodayActive = '/tournaments/today/active';
-  static const String tournamentsUpcoming = '/tournaments/upcoming';
-  static const String tournamentsTomorrow = '/tournaments/tomorrow';
-  static const String tournamentsHistory = '/tournaments/history';
+  static String tournamentRounds(String id) => '/tournaments/$id/rounds';
+  static String tournamentParticipants(String id) => '/tournaments/$id/participants';
+  static String tournamentMyRegistration(String id) => '/tournaments/$id/my-registration';
 
   // Participants
-  static String tournamentParticipants(String id) => '/tournaments/$id/participants';
+  static const String participantsMy = '/participants/my';
   static String tournamentRegister(String id) => '/tournaments/$id/register';
 
   // Liveboard
+  static String liveboardByTournament(String tournamentId) =>
+      '/liveboard/$tournamentId';
+  static String liveboardByRound(String tournamentId, String roundId) =>
+      '/liveboard/$tournamentId/round/$roundId';
   static String liveboardWs(String tournamentId) =>
-      'wss://api.tournamenthub.com/ws/tournament/$tournamentId/liveboard';
-
-  // Payments
-  static const String paymentReferralValidate = '/payments/referral/validate';
-  static const String paymentOrderCreate = '/payments/orders/create';
-  static const String paymentVerify = '/payments/verify';
-  static String paymentOrderStatus(String orderId) =>
-      '/payments/orders/$orderId/status';
+      'ws://localhost:3000/ws/tournament/$tournamentId';
 
   // Admin
   static const String adminTournaments = '/admin/tournaments';
   static String adminTournamentById(String id) => '/admin/tournaments/$id';
-  static String adminParticipantStatus(String id) =>
-      '/admin/participants/$id/status';
-  static const String adminParticipantsExport = '/admin/participants/export';
-  static String adminPaymentRefund(String paymentId) =>
-      '/admin/payments/$paymentId/refund';
+  static String adminTournamentStatus(String id) => '/admin/tournaments/$id/status';
   static const String adminStats = '/admin/stats';
 
   // Timeouts

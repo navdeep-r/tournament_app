@@ -115,7 +115,13 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
             style: AppTypography.titleLarge),
         leading: IconButton(
           icon: const Icon(Icons.close_rounded),
-          onPressed: () => context.pop(),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/home');
+            }
+          },
         ),
       ),
       body: Form(

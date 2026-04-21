@@ -16,11 +16,24 @@ class ProfileScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return BlocListener<AuthBloc, AuthState>(
       listener: (context, state) {
-        if (state is AuthUnauthenticated) context.go('/login');
+        if (state is AuthUnauthenticated) {
+          // Use replace to ensure user can't go back to profile
+          context.go('/login');
+        }
       },
       child: CreamScaffold(
         appBar: AppBar(
           title: Text('My Profile', style: AppTypography.titleLarge),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_ios_new_rounded),
+            onPressed: () {
+              if (context.canPop()) {
+                context.pop();
+              } else {
+                context.go('/home');
+              }
+            },
+          ),
         ),
         body: BlocBuilder<AuthBloc, AuthState>(
           builder: (context, state) {
@@ -65,22 +78,38 @@ class ProfileScreen extends StatelessWidget {
                 _ProfileTile(
                   icon: Icons.notifications_outlined,
                   label: 'Notifications',
-                  onTap: () {},
+                  onTap: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Notifications feature coming soon')),
+                    );
+                  },
                 ),
                 _ProfileTile(
                   icon: Icons.payment_outlined,
                   label: 'Payment History',
-                  onTap: () {},
+                  onTap: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Payment History feature coming soon')),
+                    );
+                  },
                 ),
                 _ProfileTile(
                   icon: Icons.help_outline_rounded,
                   label: 'Help & Support',
-                  onTap: () {},
+                  onTap: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Help & Support feature coming soon')),
+                    );
+                  },
                 ),
                 _ProfileTile(
                   icon: Icons.privacy_tip_outlined,
                   label: 'Privacy Policy',
-                  onTap: () {},
+                  onTap: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Privacy Policy feature coming soon')),
+                    );
+                  },
                 ),
                 _SectionHeader('Danger Zone'),
                 const SizedBox(height: 12),
@@ -113,6 +142,7 @@ class ProfileScreen extends StatelessWidget {
           TextButton(
             onPressed: () {
               Navigator.pop(context);
+              // Emit sign out event - will trigger listener to navigate to login
               context.read<AuthBloc>().add(AuthSignOutRequested());
             },
             child: Text('Sign Out',

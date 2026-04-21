@@ -22,6 +22,11 @@ class PaymentPhoneChanged extends PaymentEvent {
 
 class PaymentPhoneSubmitted extends PaymentEvent {}
 
+class PaymentSendOtpRequested extends PaymentEvent {
+  final String phone;
+  PaymentSendOtpRequested(this.phone);
+}
+
 class PaymentOtpChanged extends PaymentEvent {
   final String otp;
   PaymentOtpChanged(this.otp);
@@ -176,6 +181,8 @@ class PaymentBloc extends Bloc<PaymentEvent, PaymentState> {
 
     on<PaymentInitRequested>(_onInit);
     on<PaymentPhoneChanged>(_onPhoneChanged);
+    on<PaymentPhoneSubmitted>(_onPhoneSubmitted);
+    on<PaymentSendOtpRequested>(_onSendOtp);
     on<PaymentOtpVerified>(_onOtpVerified);
     on<PaymentReferralSubmitted>(_onReferralSubmitted);
     on<PaymentReferralRemoved>(_onReferralRemoved);
@@ -209,6 +216,30 @@ class PaymentBloc extends Bloc<PaymentEvent, PaymentState> {
     final isValid = cleaned.length == 10 &&
         RegExp(r'^[6-9]\d{9}$').hasMatch(cleaned);
     emit(state.copyWith(phone: cleaned, isPhoneValid: isValid));
+  }
+
+  void _onPhoneSubmitted(
+      PaymentPhoneSubmitted event, Emitter<PaymentState> emit) {
+    if (state.isPhoneValid) {
+      emit(state.copyWith(isOtpSent: true, status: PaymentStatus.phoneVerification));
+    }
+  }
+
+  Future<void> _onSendOtp(
+      PaymentSendOtpRequested event, Emitter<PaymentState> emit) async {
+    emit(state.copyWith(status: PaymentStatus.phoneVerification));
+    try {
+      await _repo.sendOtp(phone: event.phone);
+      emit(state.copyWith(
+        isOtpSent: true,
+        status: PaymentStatus.idle,
+      ));
+    } catch (e) {
+      emit(state.copyWith(
+        status: PaymentStatus.idle,
+        errorMessage: 'Failed to send OTP. Try again.',
+      ));
+    }
   }
 
   void _onOtpVerified(

@@ -56,7 +56,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           title: Text('Checkout', style: AppTypography.titleLarge),
           leading: IconButton(
             icon: const Icon(Icons.arrow_back_ios_new_rounded),
-            onPressed: () => context.pop(),
+            onPressed: () {
+              // Use GoRouter's pop which properly handles the navigation stack
+              if (context.canPop()) {
+                context.pop();
+              } else {
+                // Fallback: navigate back to tournament detail
+                context.go('/home');
+              }
+            },
           ),
         ),
         body: Column(
@@ -260,11 +268,15 @@ class _Step1PhoneState extends State<_Step1Phone>
               ),
               const SizedBox(height: 24),
 
-              if (!_otpSent)
+              if (!state.isOtpSent)
                 GoldButton(
                   label: 'Send OTP',
                   onPressed: state.isPhoneValid
-                      ? () => setState(() => _otpSent = true)
+                      ? () {
+                          context.read<PaymentBloc>().add(
+                                PaymentSendOtpRequested(state.phone),
+                              );
+                        }
                       : null,
                   isLoading: state.status == PaymentStatus.phoneVerification,
                 )
@@ -306,7 +318,9 @@ class _Step1PhoneState extends State<_Step1Phone>
                   ),
                 ),
                 TextButton(
-                  onPressed: () {},
+                  onPressed: () => context.read<PaymentBloc>().add(
+                        PaymentSendOtpRequested(state.phone),
+                      ),
                   child: Text('Resend OTP',
                       style: AppTypography.labelMedium
                           .copyWith(color: AppColors.primaryBrand)),
