@@ -14,11 +14,10 @@ const {
 } = require('../../core/errors/HttpErrors');
 
 class AuthService {
-  constructor({ userRepo, otpRepo, firebaseAuth, redis }) {
+  constructor({ userRepo, otpRepo, firebaseAuth }) {
     this.userRepo = userRepo;
     this.otpRepo = otpRepo;
     this.firebaseAuth = firebaseAuth;
-    this.redis = redis;
   }
 
   async googleSignIn(idToken) {
@@ -46,11 +45,6 @@ class AuthService {
   async sendOtp(rawPhone) {
     const phone = parsePhoneE164(rawPhone);
     if (!phone) throw new BadRequestError('Invalid Indian mobile number');
-
-    const key = 'otp_rl:' + phone;
-    const count = await this.redis.incr(key);
-    if (count === 1) await this.redis.expire(key, 60);
-    if (count > 3) throw new TooManyRequestsError('Too many OTP requests. Wait 1 minute.');
 
     const otp = generateOtp();
     const otp_hash = await bcrypt.hash(otp, 10);

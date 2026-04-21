@@ -1,12 +1,11 @@
 const db = require('../../config/db');
-const { redis } = require('../../config/redis');
 const { auth: firebaseAuth } = require('../../config/firebase');
 const AuthService = require('./auth.service');
 const { UserRepository, OtpRepository } = require('./auth.repository');
 
 const userRepo = new UserRepository({ query: db.query });
 const otpRepo = new OtpRepository({ query: db.query });
-const authService = new AuthService({ userRepo, otpRepo, firebaseAuth, redis });
+const authService = new AuthService({ userRepo, otpRepo, firebaseAuth });
 
 const googleSignIn = async (req, res) => {
   const data = await authService.googleSignIn(req.body.id_token || req.body.idToken);

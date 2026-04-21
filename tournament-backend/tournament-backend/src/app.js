@@ -8,7 +8,6 @@ const morgan = require('morgan');
 
 const logger = require('./core/utils/logger');
 const db = require('./config/db');
-const { redis } = require('./config/redis');
 const { notFound, errorHandler } = require('./core/middleware/error.middleware');
 
 const app = express();
@@ -37,12 +36,10 @@ app.use('/api/admin',       require('./features/admin/admin.routes'));
 // Health check
 app.get('/health', async (req, res) => {
   const dbOk    = await db.query('SELECT 1').then(() => 'ok').catch(() => 'error');
-  const redisOk = await redis.ping().then(() => 'ok').catch(() => 'error');
   res.json({
-    status: dbOk === 'ok' && redisOk === 'ok' ? 'ok' : 'degraded',
+    status: dbOk === 'ok' ? 'ok' : 'degraded',
     timestamp: new Date().toISOString(),
     db: dbOk,
-    redis: redisOk,
     uptime: process.uptime(),
   });
 });

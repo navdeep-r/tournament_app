@@ -3,7 +3,6 @@ require('dotenv').config();
 const http = require('http');
 const app = require('./app');
 const db = require('./config/db');
-const { redis, redisSubscriber } = require('./config/redis');
 const WebSocketManager = require('./features/liveboard/ws.manager');
 const LiveboardService = require('./features/liveboard/liveboard.service');
 const logger = require('./core/utils/logger');
@@ -12,7 +11,7 @@ const server = http.createServer(app);
 
 // WebSocket + liveboard setup
 const liveboardService = new LiveboardService({ query: db.query });
-const wsManager = new WebSocketManager(server, redisSubscriber, redis, liveboardService);
+const wsManager = new WebSocketManager(server, liveboardService);
 app.set('wsManager', wsManager);
 
 // Start background jobs
@@ -31,8 +30,6 @@ async function shutdown(signal) {
   server.close(async () => {
     try {
       await db.pool.end();
-      await redis.quit();
-      await redisSubscriber.quit();
       logger.info('Graceful shutdown complete');
       process.exit(0);
     } catch (err) {

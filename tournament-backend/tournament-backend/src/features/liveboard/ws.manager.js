@@ -1,23 +1,22 @@
 const { WebSocketServer, WebSocket } = require('ws');
+const { EventEmitter } = require('events');
 const jwtUtil = require('../../core/utils/jwt');
 const logger = require('../../core/utils/logger');
 
 class WebSocketManager {
-  constructor(httpServer, redisSubscriber, redisPublisher, liveboardService) {
-    this.redisPublisher = redisPublisher;
+  constructor(httpServer, liveboardService) {
     this.liveboardService = liveboardService;
     this.rooms = new Map();         // tournamentId → Set<WebSocket>
     this.clientMeta = new WeakMap(); // ws → { userId, tournamentId }
+    this.localBus = new EventEmitter();
 
     this.wss = new WebSocketServer({ server: httpServer, path: '/ws' });
 
-    redisSubscriber.subscribe('liveboard:updates');
-    redisSubscriber.on('message', (channel, message) => {
+    this.localBus.on('liveboard:updates', (tournamentId, payload) => {
       try {
-        const { tournament_id, payload } = JSON.parse(message);
-        this._broadcastToLocalRoom(tournament_id, payload);
+        this._broadcastToLocalRoom(tournamentId, payload);
       } catch (err) {
-        logger.error('WS Redis message parse error', { err: err.message });
+        logger.error('WS local event parse error', { err: err.message });
       }
     });
 
@@ -86,8 +85,7 @@ class WebSocketManager {
   }
 
   async broadcastUpdate(tournamentId, payload) {
-    const message = JSON.stringify({ tournament_id: tournamentId, payload });
-    await this.redisPublisher.publish('liveboard:updates', message);
+    this.localBus.emit('liveboard:updates', tournamentId, payload);
   }
 
   _broadcastToLocalRoom(tournamentId, payload) {
