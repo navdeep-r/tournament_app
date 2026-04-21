@@ -16,7 +16,14 @@ app.set('trust proxy', 1);
 
 app.use(helmet());
 app.use(cors({
-  origin: process.env.ALLOWED_ORIGINS?.split(',') || '*',
+  origin: (origin, callback) => {
+    if (!origin || origin.startsWith('http://localhost') || origin.startsWith('http://127.0.0.1')) {
+      callback(null, true);
+    } else {
+      const allowed = process.env.ALLOWED_ORIGINS?.split(',') || [];
+      callback(null, allowed.includes(origin) ? true : allowed);
+    }
+  },
   credentials: true,
 }));
 app.use(compression());

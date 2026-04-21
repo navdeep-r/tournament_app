@@ -124,6 +124,6 @@ class TournamentHubApp extends StatelessWidget {
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  GoogleFonts.config.allowRuntimeFetching = false;
+  GoogleFonts.config.allowRuntimeFetching = true;
   runApp(const TournamentHubApp());
 }
