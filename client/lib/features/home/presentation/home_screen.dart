@@ -56,7 +56,20 @@ class _HomeScreenState extends State<HomeScreen> {
           if (i == 1) {
             final state = context.read<HomeBloc>().state;
             if (state is HomeLoaded && state.activeToday.isNotEmpty) {
-              context.push('/liveboard/${state.activeToday.first.id}');
+              final registeredLive = state.activeToday.where((t) {
+                return state.registeredTournamentIds.contains(t.id);
+              }).toList();
+              if (registeredLive.isNotEmpty) {
+                context.push('/liveboard/${registeredLive.first.id}');
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'You are not registered in any live tournament yet',
+                    ),
+                  ),
+                );
+              }
             } else {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('No active tournament live right now')),
@@ -92,6 +105,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildContent(HomeLoaded state) {
+    final registeredTournamentIds = state.registeredTournamentIds;
     return RefreshIndicator(
       color: AppColors.primaryBrand,
       onRefresh: () async =>
@@ -109,13 +123,13 @@ class _HomeScreenState extends State<HomeScreen> {
 
           // Active tournaments
           if (state.activeToday.isNotEmpty) ...[
-            _SectionHeader(title: 'Currently Active'),
+            _SectionHeader(title: 'Active Tournaments'),
             const SizedBox(height: 12),
             ...state.activeToday.map((t) => Padding(
                   padding: const EdgeInsets.only(bottom: 12),
                   child: ActiveTournamentCard(
                     tournament: t,
-                    isRegistered: false,
+                    isRegistered: registeredTournamentIds.contains(t.id),
                     onViewBoard: () =>
                         context.push('/liveboard/${t.id}'),
                     onRegister: () =>
@@ -126,45 +140,23 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
 
           // Today's schedule
-          if (state.upcoming.isNotEmpty) ...[
-            _SectionHeader(title: "Today's Schedule"),
+          if (state.scheduled.isNotEmpty) ...[
+            _SectionHeader(title: 'Scheduled Tournaments'),
             const SizedBox(height: 12),
             SizedBox(
               height: 270,
               child: ListView.builder(
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.only(left: 16),
-                itemCount: state.upcoming.length,
+                itemCount: state.scheduled.length,
                 itemBuilder: (_, i) => UpcomingTournamentCard(
-                  tournament: state.upcoming[i],
-                  isRegistered: false,
+                  tournament: state.scheduled[i],
+                  isRegistered:
+                      registeredTournamentIds.contains(state.scheduled[i].id),
                   onJoin: () => context
-                      .push('/tournament/${state.upcoming[i].id}/checkout'),
+                      .push('/tournament/${state.scheduled[i].id}/checkout'),
                   onTap: () => context
-                      .go('/tournament/${state.upcoming[i].id}'),
-                ),
-              ),
-            ),
-            const SizedBox(height: 24),
-          ],
-
-          // Tomorrow
-          if (state.tomorrow.isNotEmpty) ...[
-            _SectionHeader(title: "Tomorrow's Tournaments"),
-            const SizedBox(height: 12),
-            SizedBox(
-              height: 270,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.only(left: 16),
-                itemCount: state.tomorrow.length,
-                itemBuilder: (_, i) => UpcomingTournamentCard(
-                  tournament: state.tomorrow[i],
-                  isRegistered: false,
-                  onJoin: () => context
-                      .push('/tournament/${state.tomorrow[i].id}/checkout'),
-                  onTap: () => context
-                      .go('/tournament/${state.tomorrow[i].id}'),
+                      .go('/tournament/${state.scheduled[i].id}'),
                 ),
               ),
             ),

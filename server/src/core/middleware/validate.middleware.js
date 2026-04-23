@@ -7,6 +7,7 @@ const validate = (schema) => (req, res, next) => {
       field: d.context?.key || 'unknown',
       message: d.message.replace(/['"]/g, ''),
     }));
+    console.error('Validation Error Details:', details, 'Body:', req.body);
     throw new ValidationError('Validation failed', details);
   }
   req.body = value;

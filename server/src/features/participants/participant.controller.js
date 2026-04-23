@@ -13,12 +13,18 @@ const participantService = new ParticipantService({
 });
 
 const register = async (req, res) => {
-  const { phone } = req.body;
+  const { phone, referral_code } = req.body;
   if (!phone) {
     return res.status(422).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'phone is required' } });
   }
-  const participant = await participantService.register(req.params.id, req.user.id, phone);
+  const participant = await participantService.register(req.params.id, req.user.id, phone, referral_code);
   res.status(201).json({ success: true, data: participant });
+};
+
+const validateReferral = async (req, res) => {
+  const { code } = req.body;
+  const referral = await participantService.validateReferralCode(req.params.id, code);
+  res.json({ success: true, data: referral });
 };
 
 const getMyRegistrations = async (req, res) => {
@@ -26,4 +32,4 @@ const getMyRegistrations = async (req, res) => {
   res.json({ success: true, data: registrations });
 };
 
-module.exports = { register, getMyRegistrations };
+module.exports = { register, getMyRegistrations, validateReferral };

@@ -126,6 +126,7 @@ class PaymentState {
     String? otp,
     String? referralCode,
     ReferralCode? appliedReferral,
+    bool clearAppliedReferral = false,
     bool? isValidatingReferral,
     String? referralError,
     List<PaymentMethod>? availableMethods,
@@ -147,7 +148,8 @@ class PaymentState {
         isOtpSent: isOtpSent ?? this.isOtpSent,
         otp: otp ?? this.otp,
         referralCode: referralCode ?? this.referralCode,
-        appliedReferral: appliedReferral ?? this.appliedReferral,
+        appliedReferral:
+            clearAppliedReferral ? null : (appliedReferral ?? this.appliedReferral),
         isValidatingReferral: isValidatingReferral ?? this.isValidatingReferral,
         referralError: referralError,
         availableMethods: availableMethods ?? this.availableMethods,
@@ -249,23 +251,27 @@ class PaymentBloc extends Bloc<PaymentEvent, PaymentState> {
 
   Future<void> _onReferralSubmitted(
       PaymentReferralSubmitted event, Emitter<PaymentState> emit) async {
-    if (event.code.trim().isEmpty) return;
+    if (event.code.trim().isEmpty) {
+      emit(state.copyWith(referralError: 'Please enter a referral code'));
+      return;
+    }
     emit(state.copyWith(
         isValidatingReferral: true, referralError: null));
     try {
+      final normalized = event.code.trim().toUpperCase();
       final referral = await _repo.validateReferralCode(
-        code: event.code,
+        code: normalized,
         tournamentId: state.tournamentId,
       );
       if (referral.isValid) {
-        final discount = _calculateDiscount(
-            originalPaise: state.originalAmountPaise, referral: referral);
         emit(state.copyWith(
           appliedReferral: referral,
-          discountAmountPaise: discount,
-          finalAmountPaise: state.originalAmountPaise - discount,
+          originalAmountPaise: referral.originalAmountPaise,
+          discountAmountPaise: referral.discountAmountPaise,
+          finalAmountPaise: referral.finalAmountPaise,
           isValidatingReferral: false,
-          referralCode: event.code.toUpperCase(),
+          referralCode: normalized,
+          referralError: null,
         ));
       } else {
         emit(state.copyWith(
@@ -276,7 +282,7 @@ class PaymentBloc extends Bloc<PaymentEvent, PaymentState> {
     } catch (_) {
       emit(state.copyWith(
         isValidatingReferral: false,
-        referralError: 'Could not validate code. Try again.',
+        referralError: 'Invalid or non-existent referral code',
       ));
     }
   }
@@ -285,8 +291,10 @@ class PaymentBloc extends Bloc<PaymentEvent, PaymentState> {
       PaymentReferralRemoved event, Emitter<PaymentState> emit) {
     emit(state.copyWith(
       referralCode: '',
+      clearAppliedReferral: true,
       discountAmountPaise: 0,
       finalAmountPaise: state.originalAmountPaise,
+      referralError: null,
     ));
   }
 
@@ -313,9 +321,13 @@ class PaymentBloc extends Bloc<PaymentEvent, PaymentState> {
         status: PaymentStatus.idle,
       ));
     } catch (e) {
+      final message = e.toString().toLowerCase().contains('referral')
+          ? 'Invalid or non-existent referral code'
+          : 'Failed to create order. Please try again.';
       emit(state.copyWith(
-        status: PaymentStatus.failure,
-        errorMessage: 'Failed to create order. Please try again.',
+        status: PaymentStatus.idle,
+        referralError: message,
+        errorMessage: message,
       ));
     }
   }
@@ -438,14 +450,6 @@ class PaymentBloc extends Bloc<PaymentEvent, PaymentState> {
     } else {
       emit(state.copyWith(status: PaymentStatus.idle, currentStep: 2));
     }
-  }
-
-  int _calculateDiscount(
-      {required int originalPaise, required ReferralCode referral}) {
-    if (referral.discountType == 'percent') {
-      return (originalPaise * referral.discountValue / 100).round();
-    }
-    return referral.discountValue * 100;
   }
 
   void _onRazorpaySuccess(PaymentSuccessResponse r) =>

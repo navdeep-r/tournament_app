@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+import 'package:dio/dio.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/constants/api_constants.dart';
 
@@ -11,6 +13,11 @@ class AdminRepository {
     return response.data['data'] as List<dynamic>;
   }
 
+  Future<Map<String, dynamic>> getTournamentById(String id) async {
+    final response = await _api.get(ApiConstants.tournamentById(id));
+    return response.data['data'] as Map<String, dynamic>;
+  }
+
   Future<Map<String, dynamic>> createTournament(
       Map<String, dynamic> data) async {
     final payload = {...data, 'status': 'upcoming'};
@@ -20,8 +27,20 @@ class AdminRepository {
 
   Future<Map<String, dynamic>> updateTournament(
       String id, Map<String, dynamic> data) async {
-    final response = await _api.put(ApiConstants.tournamentById(id), data: data);
-    return response.data['data'] as Map<String, dynamic>;
+    debugPrint('UPDATE URL: ${ApiConstants.tournamentById(id)}');
+    debugPrint('UPDATE PAYLOAD: $data');
+    try {
+      final response = await _api.put(ApiConstants.tournamentById(id), data: data);
+      return response.data['data'] as Map<String, dynamic>;
+    } on DioException catch (e) {
+      final payload = e.response?.data;
+      final serverMessage = payload is Map<String, dynamic>
+          ? (payload['error'] is Map<String, dynamic>
+              ? payload['error']['message']?.toString()
+              : payload['message']?.toString())
+          : null;
+      throw Exception(serverMessage ?? 'Failed to update tournament');
+    }
   }
 
   Future<void> deleteTournament(String id) async {

@@ -64,6 +64,7 @@ class AdminError extends AdminState {
 // ── BLoC ───────────────────────────────────────────────────────────────────────
 class AdminBloc extends Bloc<AdminEvent, AdminState> {
   final AdminRepository _repo;
+  AdminRepository get repo => _repo;
 
   AdminBloc(this._repo) : super(AdminInitial()) {
     on<AdminDashboardLoadRequested>(_onLoadDashboard);

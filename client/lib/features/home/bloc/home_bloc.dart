@@ -14,14 +14,14 @@ class HomeLoading extends HomeState {}
 
 class HomeLoaded extends HomeState {
   final List<TournamentModel> activeToday;
-  final List<TournamentModel> upcoming;
-  final List<TournamentModel> tomorrow;
+  final List<TournamentModel> scheduled;
   final List<ParticipationModel> history;
+  final Set<String> registeredTournamentIds;
   HomeLoaded({
     required this.activeToday,
-    required this.upcoming,
-    required this.tomorrow,
+    required this.scheduled,
     required this.history,
+    required this.registeredTournamentIds,
   });
 }
 
@@ -44,15 +44,15 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     try {
       final results = await Future.wait([
         _repo.getTodayActive(),
-        _repo.getUpcoming(),
-        _repo.getTomorrow(),
+        _repo.getScheduled(),
         _repo.getUserHistory(),
       ]);
+      final history = results[2] as List<ParticipationModel>;
       emit(HomeLoaded(
         activeToday: results[0] as List<TournamentModel>,
-        upcoming: results[1] as List<TournamentModel>,
-        tomorrow: results[2] as List<TournamentModel>,
-        history: results[3] as List<ParticipationModel>,
+        scheduled: results[1] as List<TournamentModel>,
+        history: history,
+        registeredTournamentIds: history.map((p) => p.tournamentId).toSet(),
       ));
     } catch (e) {
       emit(HomeError(e.toString()));

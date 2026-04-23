@@ -28,18 +28,20 @@ class PaymentRepository {
     required String code,
     required String tournamentId,
   }) async {
-    await Future.delayed(const Duration(milliseconds: 500));
-    if (code.toUpperCase() == 'DISCOUNT50') {
-      return const ReferralCode(
-        code: 'DISCOUNT50',
-        discountType: 'fixed',
-        discountValue: 5000,
-        maxUses: 100,
-        usedCount: 0,
-        isValid: true,
-      );
+    final normalized = code.trim().toUpperCase();
+    if (normalized.isEmpty) {
+      throw Exception('Referral code cannot be empty');
     }
-    throw Exception('Invalid referral code');
+    try {
+      final response = await _api.post(
+        ApiConstants.tournamentReferralValidate(tournamentId),
+        data: {'code': normalized},
+      );
+      final data = response.data['data'] as Map<String, dynamic>;
+      return ReferralCode.fromJson(data);
+    } catch (e) {
+      throw Exception('Invalid referral code');
+    }
   }
 
   // 2. Register user for tournament
@@ -57,19 +59,22 @@ class PaymentRepository {
         },
       );
 
-      final data = response.data;
+      final data = (response.data['data'] ?? response.data) as Map<String, dynamic>;
+      final now = DateTime.now();
       return PaymentOrder(
-        orderId: data['order_id'],
+        orderId: data['order_id']?.toString() ?? data['id'].toString(),
         tournamentId: tournamentId,
-        tournamentName: data['tournament_name'],
-        amountPaise: data['amount_paise'],
-        originalAmountPaise: data['original_amount_paise'],
+        tournamentName: data['tournament_name']?.toString() ?? 'Tournament',
+        amountPaise: (data['amount_paise'] as num?)?.toInt() ?? 0,
+        originalAmountPaise: (data['original_amount_paise'] as num?)?.toInt() ?? 0,
         discountPaise: data['discount_paise'] ?? 0,
         currency: 'INR',
-        receipt: data['receipt'],
+        receipt: data['receipt']?.toString() ?? 'manual_receipt',
         userPhone: userPhone,
-        expiresAt: DateTime.parse(data['expires_at']),
-        status: data['status'],
+        expiresAt: data['expires_at'] != null
+            ? DateTime.parse(data['expires_at'].toString())
+            : now.add(const Duration(minutes: 15)),
+        status: data['status']?.toString() ?? 'created',
       );
     } catch (e) {
       throw Exception('Failed to register: $e');

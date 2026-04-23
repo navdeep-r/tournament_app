@@ -26,16 +26,63 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
   final _maxParticipantsController = TextEditingController(text: '500');
   final _entryFeeController = TextEditingController();
   final _rulesController = TextEditingController();
+  final List<_ReferralEntry> _referrals = [];
 
   DateTime? _startDateTime;
   DateTime? _registrationDeadline;
   File? _bannerImage;
+  bool _isLoadingExisting = false;
 
   final List<_RoundEntry> _rounds = [
     _RoundEntry(name: 'Round 1', description: ''),
   ];
 
   bool get isEdit => widget.tournamentId != null;
+
+  @override
+  void initState() {
+    super.initState();
+    if (isEdit) {
+      _loadExistingTournament();
+    }
+  }
+
+  Future<void> _loadExistingTournament() async {
+    setState(() => _isLoadingExisting = true);
+    try {
+      final repo = context.read<AdminBloc>().repo;
+      final data = await repo.getTournamentById(widget.tournamentId!);
+      if (!mounted) return;
+      setState(() {
+        _nameController.text = data['name'] ?? '';
+        _descController.text = data['description'] ?? '';
+        _maxParticipantsController.text = '${data['max_participants'] ?? 500}';
+        _entryFeeController.text = '${data['entry_fee_paise'] ?? 0}';
+        _rulesController.text = data['rules'] ?? '';
+        if (data['starts_at'] != null) {
+          _startDateTime = DateTime.tryParse(data['starts_at']);
+        }
+        if (data['registration_closes_at'] != null) {
+          _registrationDeadline = DateTime.tryParse(data['registration_closes_at']);
+        }
+        final referralRows = (data['referral_codes'] as List<dynamic>?) ?? const [];
+        _referrals
+          ..clear()
+          ..addAll(referralRows.map((item) {
+            final row = item as Map<String, dynamic>;
+            return _ReferralEntry(
+              code: row['code']?.toString() ?? '',
+              discountPercent: (row['discount_percent'] as num?)?.toInt() ?? 0,
+            );
+          }));
+        _isLoadingExisting = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoadingExisting = false);
+      showErrorSnackbar(context, 'Failed to load tournament: $e');
+    }
+  }
 
   @override
   void dispose() {
@@ -98,6 +145,37 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
       showErrorSnackbar(context, 'Please set a start date and time.');
       return;
     }
+    final nonEmptyReferrals = _referrals.where((r) => r.code.trim().isNotEmpty).toList();
+    for (final r in nonEmptyReferrals) {
+      final code = r.code.trim().toUpperCase();
+      final validCode = RegExp(r'^[A-Z0-9_-]{3,20}$').hasMatch(code);
+      if (!validCode) {
+        showErrorSnackbar(
+          context,
+          'Referral codes must be 3-20 chars (A-Z, 0-9, _ or -).',
+        );
+        return;
+      }
+      if (r.discountPercent < 1 || r.discountPercent > 100) {
+        showErrorSnackbar(context, 'Referral discount must be between 1 and 100.');
+        return;
+      }
+    }
+    final distinct = nonEmptyReferrals
+        .map((r) => r.code.trim().toUpperCase())
+        .toSet();
+    if (distinct.length != nonEmptyReferrals.length) {
+      showErrorSnackbar(context, 'Duplicate referral codes are not allowed.');
+      return;
+    }
+
+    final referralPayload = _referrals
+        .where((r) => r.code.trim().isNotEmpty)
+        .map((r) => {
+              'code': r.code.trim().toUpperCase(),
+              'discount_percent': r.discountPercent,
+            })
+        .toList();
 
     final data = {
       'name': _nameController.text.trim(),
@@ -107,6 +185,9 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
       'rules': _rulesController.text.trim(),
       'starts_at': _startDateTime!.toIso8601String(),
     };
+    if (referralPayload.isNotEmpty) {
+      data['referral_codes'] = referralPayload;
+    }
     if (_registrationDeadline != null) {
       data['registration_closes_at'] = _registrationDeadline!.toIso8601String();
     }
@@ -136,6 +217,12 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
       },
       builder: (context, state) {
         final _isSaving = state is AdminOperationInProgress;
+        if (_isLoadingExisting) {
+          return CreamScaffold(
+            appBar: AppBar(title: Text('Loading...', style: AppTypography.titleLarge)),
+            body: const Center(child: CircularProgressIndicator()),
+          );
+        }
         return CreamScaffold(
           appBar: AppBar(
             title: Text(isEdit ? 'Edit Tournament' : 'New Tournament',
@@ -230,6 +317,32 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
                   ),
                 ),
               ],
+            ),
+            const SizedBox(height: 20),
+
+            // ── Referrals ────────────────────────────────────────────
+            _SectionLabel('Referral Codes (Optional)'),
+            const SizedBox(height: 8),
+            if (_referrals.isEmpty)
+              Text('No referral codes added yet.', style: AppTypography.caption),
+            ..._referrals.asMap().entries.map((entry) {
+              return _ReferralEditorCard(
+                key: ValueKey('ref_${entry.key}'),
+                index: entry.key,
+                referral: entry.value,
+                onChanged: (updated) =>
+                    setState(() => _referrals[entry.key] = updated),
+                onDelete: () => setState(() => _referrals.removeAt(entry.key)),
+              );
+            }),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: () => setState(() => _referrals.add(_ReferralEntry())),
+              icon: const Icon(Icons.local_offer_outlined),
+              label: const Text('Add Referral Code'),
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size(double.infinity, 46),
+              ),
             ),
             const SizedBox(height: 20),
 
@@ -359,6 +472,102 @@ class _RoundEntry {
     this.scheduledAt,
     this.maxParticipants = 100,
   });
+}
+
+class _ReferralEntry {
+  String code;
+  int discountPercent;
+
+  _ReferralEntry({this.code = '', this.discountPercent = 10});
+}
+
+class _ReferralEditorCard extends StatefulWidget {
+  final int index;
+  final _ReferralEntry referral;
+  final ValueChanged<_ReferralEntry> onChanged;
+  final VoidCallback onDelete;
+
+  const _ReferralEditorCard({
+    super.key,
+    required this.index,
+    required this.referral,
+    required this.onChanged,
+    required this.onDelete,
+  });
+
+  @override
+  State<_ReferralEditorCard> createState() => _ReferralEditorCardState();
+}
+
+class _ReferralEditorCardState extends State<_ReferralEditorCard> {
+  late TextEditingController _codeCtrl;
+  late TextEditingController _discountCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _codeCtrl = TextEditingController(text: widget.referral.code);
+    _discountCtrl =
+        TextEditingController(text: widget.referral.discountPercent.toString());
+  }
+
+  @override
+  void dispose() {
+    _codeCtrl.dispose();
+    _discountCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: AppTheme.cardDecoration,
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller: _codeCtrl,
+              textCapitalization: TextCapitalization.characters,
+              maxLength: 20,
+              decoration: const InputDecoration(
+                labelText: 'Code',
+                hintText: 'e.g. FRIEND10',
+                counterText: '',
+              ),
+              onChanged: (v) {
+                widget.referral.code = v.toUpperCase().trim();
+                widget.onChanged(widget.referral);
+              },
+            ),
+          ),
+          const SizedBox(width: 10),
+          SizedBox(
+            width: 120,
+            child: TextField(
+              controller: _discountCtrl,
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              decoration: const InputDecoration(
+                labelText: 'Discount %',
+                hintText: '10',
+              ),
+              onChanged: (v) {
+                final parsed = int.tryParse(v) ?? 0;
+                widget.referral.discountPercent = parsed.clamp(1, 100);
+                widget.onChanged(widget.referral);
+              },
+            ),
+          ),
+          IconButton(
+            onPressed: widget.onDelete,
+            icon: const Icon(Icons.delete_outline_rounded, color: AppColors.error),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class RoundEditorCard extends StatefulWidget {

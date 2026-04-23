@@ -57,7 +57,7 @@ class _LiveboardScreenState extends State<LiveboardScreen>
                   if (context.canPop()) {
                     context.pop();
                   } else {
-                    context.go('/home');
+                    context.go('/admin');
                   }
                 },
               ),
@@ -106,7 +106,7 @@ class _LiveboardScreenState extends State<LiveboardScreen>
                   if (context.canPop()) {
                     context.pop();
                   } else {
-                    context.go('/home');
+                    context.go('/admin');
                   }
                 },
               ),

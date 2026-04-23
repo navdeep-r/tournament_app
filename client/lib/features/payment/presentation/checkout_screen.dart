@@ -438,6 +438,13 @@ class _Step2ReferralState extends State<_Step2Referral> {
                     style: AppTypography.caption
                         .copyWith(color: AppColors.error)),
               ],
+              if (hasApplied) ...[
+                const SizedBox(height: 8),
+                Text(
+                  'Referral code applied successfully.',
+                  style: AppTypography.caption.copyWith(color: AppColors.success),
+                ),
+              ],
 
               // Price breakdown animated
               if (hasApplied) ...[

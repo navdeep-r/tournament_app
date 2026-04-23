@@ -45,7 +45,10 @@ class ParticipantRepository {
     return { rows, total };
   }
 
-  async createWithQueueNumber({ tournamentId, userId, phone }, client) {
+  async createWithQueueNumber(
+    { tournamentId, userId, phone, referralCode, discountPercent = 0, discountAmountPaise = 0, amountPaidPaise = 0 },
+    client
+  ) {
     const qResult = await client.query(
       'SELECT COALESCE(MAX(queue_number), 0) + 1 AS next FROM participants WHERE tournament_id=$1 FOR UPDATE',
       [tournamentId]
@@ -53,9 +56,13 @@ class ParticipantRepository {
     const queueNumber = qResult.rows[0].next;
 
     const { rows } = await client.query(
-      `INSERT INTO participants (tournament_id, user_id, phone, queue_number, status)
-       VALUES ($1, $2, $3, $4, 'registered') RETURNING *`,
-      [tournamentId, userId, phone, queueNumber]
+      `INSERT INTO participants (
+         tournament_id, user_id, phone, queue_number, status,
+         referral_code, discount_percent, discount_amount_paise, amount_paid_paise
+       )
+       VALUES ($1, $2, $3, $4, 'registered', $5, $6, $7, $8)
+       RETURNING *`,
+      [tournamentId, userId, phone, queueNumber, referralCode || null, discountPercent, discountAmountPaise, amountPaidPaise]
     );
     return rows[0];
   }

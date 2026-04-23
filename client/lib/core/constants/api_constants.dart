@@ -21,6 +21,8 @@ abstract class ApiConstants {
   static String tournamentRounds(String id) => '/tournaments/$id/rounds';
   static String tournamentParticipants(String id) => '/tournaments/$id/participants';
   static String tournamentMyRegistration(String id) => '/tournaments/$id/my-registration';
+  static String tournamentReferralValidate(String id) =>
+      '/tournaments/$id/referral/validate';
 
   // Participants
   static const String participantsMy = '/participants/my';

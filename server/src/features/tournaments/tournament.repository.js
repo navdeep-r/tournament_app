@@ -1,3 +1,5 @@
+const { BadRequestError } = require('../../core/errors/HttpErrors');
+
 class TournamentRepository {
   constructor({ query, withTransaction }) {
     this.query = query;
@@ -56,23 +58,54 @@ class TournamentRepository {
     const keys = Object.keys(data);
     const cols = keys.join(', ');
     const placeholders = keys.map((_, i) => `$${i + 1}`).join(', ');
-    const values = keys.map((k) => data[k]);
-    const { rows } = await this.query(
-      `INSERT INTO tournaments (${cols}) VALUES (${placeholders}) RETURNING *`,
-      values
+    const values = keys.map((k) =>
+      k === 'referral_codes' ? JSON.stringify(data[k] ?? []) : data[k]
     );
-    return rows[0];
+    try {
+      const { rows } = await this.query(
+        `INSERT INTO tournaments (${cols}) VALUES (${placeholders}) RETURNING *`,
+        values
+      );
+      return rows[0];
+    } catch (err) {
+      if (
+        err?.code === '42703' &&
+        keys.includes('referral_codes')
+      ) {
+        throw new BadRequestError(
+          'Referral system requires DB migration 005_add_referral_support.sql'
+        );
+      }
+      throw err;
+    }
   }
 
   async update(id, fields) {
     const keys = Object.keys(fields);
+    if (keys.length === 0) {
+      return this.findById(id);
+    }
     const setClause = keys.map((k, i) => `${k}=$${i + 2}`).join(', ');
-    const values = keys.map((k) => fields[k]);
-    const { rows } = await this.query(
-      `UPDATE tournaments SET ${setClause}, updated_at=NOW() WHERE id=$1 RETURNING *`,
-      [id, ...values]
+    const values = keys.map((k) =>
+      k === 'referral_codes' ? JSON.stringify(fields[k] ?? []) : fields[k]
     );
-    return rows[0];
+    try {
+      const { rows } = await this.query(
+        `UPDATE tournaments SET ${setClause}, updated_at=NOW() WHERE id=$1 RETURNING *`,
+        [id, ...values]
+      );
+      return rows[0];
+    } catch (err) {
+      if (
+        err?.code === '42703' &&
+        keys.includes('referral_codes')
+      ) {
+        throw new BadRequestError(
+          'Referral system requires DB migration 005_add_referral_support.sql'
+        );
+      }
+      throw err;
+    }
   }
 
   async getRoundsForTournament(tournamentId) {

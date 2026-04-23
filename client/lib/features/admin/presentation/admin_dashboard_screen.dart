@@ -8,8 +8,6 @@ import 'package:tournament_app/core/theme/app_typography.dart';
 import 'package:tournament_app/core/theme/app_theme.dart';
 import 'package:tournament_app/shared/widgets/cream_scaffold.dart';
 import 'package:tournament_app/shared/widgets/gold_button.dart';
-import 'update_results_screen.dart';
-import 'manage_participants_screen.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -19,7 +17,6 @@ class AdminDashboardScreen extends StatefulWidget {
 
 class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   int _tab = 0;
-  static const String _tid = 'tournament_001';
 
   @override
   void initState() {
@@ -70,8 +67,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               children: [
                 _DashboardTab(stats: stats),
                 _TournamentsTab(tournaments: tournaments ?? []),
-                UpdateResultsScreen(tournamentId: _tid),
-                ManageParticipantsScreen(tournamentId: _tid),
+                _LiveTab(tournaments: tournaments ?? []),
+                _ParticipantsTab(tournaments: tournaments ?? []),
               ],
             );
           },
@@ -127,16 +124,6 @@ class _DashboardTab extends StatelessWidget {
       ]),
     );
   }
-}
-
-class _RRow extends StatelessWidget {
-  final String l, v; final Color c;
-  const _RRow(this.l, this.v, this.c);
-  @override
-  Widget build(BuildContext context) => Row(
-    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-    children: [Text(l, style: AppTypography.bodySmall), Text(v, style: AppTypography.labelLarge.copyWith(color: c))],
-  );
 }
 
 class _StatCard extends StatelessWidget {
@@ -212,6 +199,156 @@ class _TournamentsTab extends StatelessWidget {
             },
           )),
       ]),
+    );
+  }
+}
+
+// ── Live Tab ─────────────────────────────────────────────────────────────────
+// Shows only tournaments with 'live' status. No dummy data.
+class _LiveTab extends StatelessWidget {
+  final List<dynamic> tournaments;
+  const _LiveTab({required this.tournaments});
+
+  @override
+  Widget build(BuildContext context) {
+    final liveTournaments = tournaments.where((t) => t['status'] == 'live').toList();
+
+    if (liveTournaments.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.live_tv_outlined, size: 64, color: AppColors.textSecondary.withOpacity(0.4)),
+              const SizedBox(height: 16),
+              Text('No Live Tournaments', style: AppTypography.headlineSmall),
+              const SizedBox(height: 8),
+              Text(
+                'Tournaments will appear here once they are set to "Live" status.',
+                style: AppTypography.bodySmall.copyWith(color: AppColors.textSecondary),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: liveTournaments.length,
+      itemBuilder: (_, i) {
+        final t = liveTournaments[i];
+        return Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.all(16),
+          decoration: AppTheme.cardDecoration,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 8, height: 8,
+                    decoration: const BoxDecoration(color: AppColors.error, shape: BoxShape.circle),
+                  ),
+                  const SizedBox(width: 8),
+                  Text('LIVE', style: AppTypography.labelSmall.copyWith(color: AppColors.error, fontWeight: FontWeight.w800)),
+                  const Spacer(),
+                  Text('${t['registered_count'] ?? 0} participants', style: AppTypography.caption),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Text(t['name'] ?? 'Unnamed', style: AppTypography.labelLarge),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () => context.go('/admin/live/${t['id']}'),
+                      icon: const Icon(Icons.visibility_rounded, size: 18),
+                      label: const Text('View Liveboard'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+// ── Participants Tab ─────────────────────────────────────────────────────────
+// Shows a tournament selector, then participants for the selected one.
+class _ParticipantsTab extends StatelessWidget {
+  final List<dynamic> tournaments;
+  const _ParticipantsTab({required this.tournaments});
+
+  @override
+  Widget build(BuildContext context) {
+    if (tournaments.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.people_outline, size: 64, color: AppColors.textSecondary.withOpacity(0.4)),
+              const SizedBox(height: 16),
+              Text('No Tournaments Yet', style: AppTypography.headlineSmall),
+              const SizedBox(height: 8),
+              Text(
+                'Create a tournament first to manage its participants.',
+                style: AppTypography.bodySmall.copyWith(color: AppColors.textSecondary),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: tournaments.length,
+      itemBuilder: (_, i) {
+        final t = tournaments[i];
+        final registered = t['registered_count'] ?? 0;
+        final maxP = t['max_participants'] ?? 0;
+        return Container(
+          margin: const EdgeInsets.only(bottom: 10),
+          padding: const EdgeInsets.all(16),
+          decoration: AppTheme.cardDecoration,
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(t['name'] ?? 'Unnamed', style: AppTypography.labelLarge, maxLines: 1, overflow: TextOverflow.ellipsis),
+                    const SizedBox(height: 4),
+                    Text('$registered / $maxP participants', style: AppTypography.caption),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryBrand.withOpacity(0.1),
+                  borderRadius: AppTheme.chipRadius,
+                ),
+                child: Text(
+                  t['status']?.toUpperCase() ?? 'DRAFT',
+                  style: AppTypography.labelSmall.copyWith(color: AppColors.primaryBrand),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

@@ -36,37 +36,18 @@ class TournamentRepository {
     return getTournaments(status: 'live');
   }
 
-  /// Fetch upcoming tournaments
-  Future<List<TournamentModel>> getUpcoming() async {
+  /// Fetch scheduled tournaments ordered by nearest start time.
+  Future<List<TournamentModel>> getScheduled() async {
     final tournaments = await getTournaments();
-    return tournaments
-        .where((t) => t.status == 'upcoming' || t.status == 'registration_open')
-        .toList();
-  }
-
-  /// Fetch tomorrow's tournaments (optional - backend may not support this)
-  Future<List<TournamentModel>> getTomorrow() async {
-    try {
-      final response = await _api.get(
-        ApiConstants.tournaments,
-      );
-      final payload = response.data['data'] as List<dynamic>;
-      final tournaments = payload
-          .map((t) => TournamentModel.fromJson(t))
-          .where((t) => t.status == 'upcoming' || t.status == 'registration_open')
-          .toList();
-      
-      // Filter for tomorrow's start times if needed
-      final now = DateTime.now();
-      final tomorrow = now.add(const Duration(days: 1));
-      return tournaments.where((t) => 
-        t.startTime.year == tomorrow.year &&
-        t.startTime.month == tomorrow.month &&
-        t.startTime.day == tomorrow.day
-      ).toList();
-    } catch (e) {
-      return getTournaments(); // Fallback to all tournaments
-    }
+    final now = DateTime.now();
+    final scheduled = tournaments.where((t) {
+      return t.startTime.isAfter(now) &&
+          (t.status == 'upcoming' ||
+              t.status == 'registration_open' ||
+              t.status == 'registration_closed');
+    }).toList()
+      ..sort((a, b) => a.startTime.compareTo(b.startTime));
+    return scheduled;
   }
 
   /// Fetch user's participation history

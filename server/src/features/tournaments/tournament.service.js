@@ -36,13 +36,21 @@ class TournamentService {
     if (new Date(data.starts_at) <= new Date()) {
       throw new BadRequestError('Start time must be in the future');
     }
-    return this.tournamentRepo.create({ ...data, created_by: adminUserId });
+    return this.tournamentRepo.create({
+      ...data,
+      referral_codes: this._normalizeReferralCodes(data.referral_codes),
+      created_by: adminUserId,
+    });
   }
 
   async update(id, data) {
     const tournament = await this.tournamentRepo.findById(id);
     if (!tournament) throw new NotFoundError('Tournament not found');
-    return this.tournamentRepo.update(id, data);
+    const updateData = { ...data };
+    if (Object.prototype.hasOwnProperty.call(data, 'referral_codes')) {
+      updateData.referral_codes = this._normalizeReferralCodes(data.referral_codes);
+    }
+    return this.tournamentRepo.update(id, updateData);
   }
 
   async updateStatus(id, newStatus) {
@@ -65,6 +73,14 @@ class TournamentService {
       throw new BadRequestError('Cannot delete active or completed tournament');
     }
     return this.tournamentRepo.update(id, { status: 'cancelled' });
+  }
+
+  _normalizeReferralCodes(referralCodes) {
+    if (!Array.isArray(referralCodes) || referralCodes.length === 0) return [];
+    return referralCodes.map((item) => ({
+      code: String(item.code || '').trim().toUpperCase(),
+      discount_percent: Number(item.discount_percent),
+    }));
   }
 }
 

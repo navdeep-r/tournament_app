@@ -59,6 +59,9 @@ class ReferralCode {
   final int usedCount;
   final bool isValid;
   final String? errorMessage;
+  final int originalAmountPaise;
+  final int discountAmountPaise;
+  final int finalAmountPaise;
 
   const ReferralCode({
     required this.code,
@@ -68,6 +71,9 @@ class ReferralCode {
     required this.usedCount,
     required this.isValid,
     this.errorMessage,
+    this.originalAmountPaise = 0,
+    this.discountAmountPaise = 0,
+    this.finalAmountPaise = 0,
   });
 
   factory ReferralCode.fromJson(Map<String, dynamic> json) => ReferralCode(
@@ -78,6 +84,9 @@ class ReferralCode {
         usedCount: json['used_count'] as int? ?? 0,
         isValid: json['is_valid'] as bool,
         errorMessage: json['error_message'] as String?,
+        originalAmountPaise: json['original_amount_paise'] as int? ?? 0,
+        discountAmountPaise: json['discount_amount_paise'] as int? ?? 0,
+        finalAmountPaise: json['final_amount_paise'] as int? ?? 0,
       );
 }
 

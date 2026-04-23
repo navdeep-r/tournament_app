@@ -115,7 +115,7 @@ class _UpdateResultsScreenState extends State<UpdateResultsScreen> {
             if (context.canPop()) {
               context.pop();
             } else {
-              context.go('/home');
+              context.go('/admin');
             }
           },
         ),
