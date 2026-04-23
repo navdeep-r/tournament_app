@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:tournament_app/features/auth/bloc/auth_bloc.dart';
+import 'package:tournament_app/features/admin/bloc/admin_bloc.dart';
 import 'package:tournament_app/core/theme/app_colors.dart';
 import 'package:tournament_app/core/theme/app_typography.dart';
 import 'package:tournament_app/core/theme/app_theme.dart';
@@ -19,6 +20,12 @@ class AdminDashboardScreen extends StatefulWidget {
 class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   int _tab = 0;
   static const String _tid = 'tournament_001';
+
+  @override
+  void initState() {
+    super.initState();
+    context.read<AdminBloc>().add(AdminDashboardLoadRequested());
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -48,14 +55,26 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             BottomNavigationBarItem(icon: Icon(Icons.people_outline), activeIcon: Icon(Icons.people_rounded), label: 'Participants'),
           ],
         ),
-        body: IndexedStack(
-          index: _tab,
-          children: [
-            _DashboardTab(),
-            _TournamentsTab(),
-            UpdateResultsScreen(tournamentId: _tid),
-            ManageParticipantsScreen(tournamentId: _tid),
-          ],
+        body: BlocBuilder<AdminBloc, AdminState>(
+          builder: (context, state) {
+            Map<String, dynamic>? stats;
+            List<dynamic>? tournaments;
+
+            if (state is AdminDashboardLoaded) {
+              stats = state.stats;
+              tournaments = state.tournaments;
+            }
+
+            return IndexedStack(
+              index: _tab,
+              children: [
+                _DashboardTab(stats: stats),
+                _TournamentsTab(tournaments: tournaments ?? []),
+                UpdateResultsScreen(tournamentId: _tid),
+                ManageParticipantsScreen(tournamentId: _tid),
+              ],
+            );
+          },
         ),
       ),
     );
@@ -63,8 +82,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 }
 
 class _DashboardTab extends StatelessWidget {
+  final Map<String, dynamic>? stats;
+  const _DashboardTab({this.stats});
+
   @override
   Widget build(BuildContext context) {
+    if (stats == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -74,29 +99,12 @@ class _DashboardTab extends StatelessWidget {
           crossAxisCount: 2, shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           crossAxisSpacing: 12, mainAxisSpacing: 12, childAspectRatio: 1.4,
-          children: const [
-            _StatCard(label: 'Total Users', value: '1,284', icon: Icons.people_rounded),
-            _StatCard(label: 'Active Tournaments', value: '3', icon: Icons.emoji_events_rounded),
-            _StatCard(label: "Today's Participants", value: '248', icon: Icons.how_to_reg_rounded),
-            _StatCard(label: "Tomorrow's Queue", value: '512', icon: Icons.schedule_rounded),
+          children: [
+            _StatCard(label: 'Total Users', value: '${stats!['total_active_users'] ?? 0}', icon: Icons.people_rounded),
+            _StatCard(label: 'Active Tournaments', value: '${stats!['active_tournaments'] ?? 0}', icon: Icons.emoji_events_rounded),
+            _StatCard(label: "Today's Participants", value: '${stats!['registrations_today'] ?? 0}', icon: Icons.how_to_reg_rounded),
+            _StatCard(label: "Live Tournaments", value: '${stats!['live_tournaments'] ?? 0}', icon: Icons.schedule_rounded),
           ],
-        ),
-        const SizedBox(height: 24),
-        Text('Revenue', style: AppTypography.headlineSmall),
-        const SizedBox(height: 12),
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: AppTheme.cardDecoration,
-          child: Column(children: [
-            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-              Text("Today's Revenue", style: AppTypography.bodyMedium),
-              Text('₹12,400', style: AppTypography.headlineSmall.copyWith(color: AppColors.primaryBrand)),
-            ]),
-            const Divider(height: 20),
-            _RRow('Pending refunds', '2', AppColors.error),
-            const SizedBox(height: 8),
-            _RRow('Total registrations', '82', AppColors.textPrimary),
-          ]),
         ),
         const SizedBox(height: 24),
         Text('Quick Actions', style: AppTypography.headlineSmall),
@@ -108,32 +116,11 @@ class _DashboardTab extends StatelessWidget {
           children: [
             _QA(icon: Icons.add_circle_outline, label: 'New Tournament', onTap: () => context.go('/admin/tournament/create')),
             _QA(
-              icon: Icons.upload_outlined,
-              label: 'Upload Photos',
+              icon: Icons.refresh,
+              label: 'Refresh',
               onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Photo upload feature coming soon')),
-                );
+                context.read<AdminBloc>().add(AdminDashboardLoadRequested());
               },
-            ),
-            _QA(
-              icon: Icons.rule_outlined,
-              label: 'Update Rules',
-              onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Update rules feature coming soon')),
-                );
-              },
-            ),
-            _QA(
-              icon: Icons.live_tv_rounded,
-              label: 'Go Live',
-              onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Go live feature coming soon')),
-                );
-              },
-              accent: true,
             ),
           ],
         ),
@@ -187,6 +174,9 @@ class _QA extends StatelessWidget {
 }
 
 class _TournamentsTab extends StatelessWidget {
+  final List<dynamic> tournaments;
+  const _TournamentsTab({required this.tournaments});
+
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -194,27 +184,33 @@ class _TournamentsTab extends StatelessWidget {
       child: Column(children: [
         GoldButton(label: '+ Create New Tournament', onPressed: () => context.go('/admin/tournament/create'), height: 46),
         const SizedBox(height: 16),
-        Expanded(child: ListView.builder(
-          itemCount: 3,
-          itemBuilder: (_, i) => Container(
-            margin: const EdgeInsets.only(bottom: 10),
-            padding: const EdgeInsets.all(16),
-            decoration: AppTheme.cardDecoration,
-            child: Row(children: [
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('Tournament ${i+1}', style: AppTypography.labelLarge),
-                Text(i == 0 ? 'Today · 3:00 PM' : i == 1 ? 'Tomorrow · 5:00 PM' : 'In 3 days', style: AppTypography.caption),
-              ])),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(color: (i==0 ? AppColors.success : AppColors.primaryBrand).withOpacity(0.1), borderRadius: AppTheme.chipRadius),
-                child: Text(i==0 ? 'Active' : 'Upcoming', style: AppTypography.labelSmall.copyWith(color: i==0 ? AppColors.success : AppColors.primaryBrand)),
-              ),
-              const SizedBox(width: 8),
-              IconButton(icon: const Icon(Icons.edit_outlined, color: AppColors.primaryBrand, size: 20), onPressed: () => context.go('/admin/tournament/$i/edit')),
-            ]),
-          ),
-        )),
+        if (tournaments.isEmpty)
+          const Expanded(child: Center(child: Text('No tournaments found'))),
+        if (tournaments.isNotEmpty)
+          Expanded(child: ListView.builder(
+            itemCount: tournaments.length,
+            itemBuilder: (_, i) {
+              final t = tournaments[i];
+              return Container(
+                margin: const EdgeInsets.only(bottom: 10),
+                padding: const EdgeInsets.all(16),
+                decoration: AppTheme.cardDecoration,
+                child: Row(children: [
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(t['name'] ?? 'Unnamed', style: AppTypography.labelLarge, maxLines: 1, overflow: TextOverflow.ellipsis),
+                    Text(t['starts_at'] != null ? t['starts_at'].toString().split('T')[0] : '', style: AppTypography.caption),
+                  ])),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(color: (t['status'] == 'live' ? AppColors.success : AppColors.primaryBrand).withOpacity(0.1), borderRadius: AppTheme.chipRadius),
+                    child: Text(t['status']?.toUpperCase() ?? 'DRAFT', style: AppTypography.labelSmall.copyWith(color: t['status'] == 'live' ? AppColors.success : AppColors.primaryBrand)),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton(icon: const Icon(Icons.edit_outlined, color: AppColors.primaryBrand, size: 20), onPressed: () => context.go('/admin/tournament/${t['id']}/edit')),
+                ]),
+              );
+            },
+          )),
       ]),
     );
   }

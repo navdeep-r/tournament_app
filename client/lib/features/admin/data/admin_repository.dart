@@ -7,33 +7,31 @@ class AdminRepository {
 
   // Tournaments CRUD
   Future<List<dynamic>> getTournaments() async {
-    await Future.delayed(const Duration(milliseconds: 500));
-    return [
-      {'id': 't_1', 'name': 'BGMI Pro League Season 4', 'status': 'upcoming'},
-      {'id': 't_2', 'name': 'Free Fire Clash Squad', 'status': 'active'}
-    ];
+    final response = await _api.get(ApiConstants.adminTournaments);
+    return response.data['data'] as List<dynamic>;
   }
 
   Future<Map<String, dynamic>> createTournament(
       Map<String, dynamic> data) async {
-    await Future.delayed(const Duration(milliseconds: 500));
-    return {'id': 't_new', ...data, 'status': 'upcoming'};
+    final payload = {...data, 'status': 'upcoming'};
+    final response = await _api.post(ApiConstants.tournaments, data: payload);
+    return response.data['data'] as Map<String, dynamic>;
   }
 
   Future<Map<String, dynamic>> updateTournament(
       String id, Map<String, dynamic> data) async {
-    await Future.delayed(const Duration(milliseconds: 500));
-    return {'id': id, ...data};
+    final response = await _api.put(ApiConstants.tournamentById(id), data: data);
+    return response.data['data'] as Map<String, dynamic>;
   }
 
   Future<void> deleteTournament(String id) async {
-    await Future.delayed(const Duration(milliseconds: 500));
+    await _api.delete(ApiConstants.tournamentById(id));
   }
 
   // Participant management
   Future<void> updateParticipantStatus(
       String participantId, String status) async {
-    await Future.delayed(const Duration(milliseconds: 500));
+    await _api.patch('/admin/participants/$participantId/status', data: {'status': status});
   }
 
   // Refund
@@ -43,17 +41,13 @@ class AdminRepository {
 
   // Stats
   Future<Map<String, dynamic>> getDashboardStats() async {
-    await Future.delayed(const Duration(milliseconds: 500));
-    return {
-      'active_tournaments': 5,
-      'total_participants': 1250,
-      'total_revenue': 500000,
-    };
+    final response = await _api.get('/admin/dashboard');
+    return response.data['data'] as Map<String, dynamic>;
   }
 
   // Export CSV
   Future<String> exportParticipantsCSV() async {
-    await Future.delayed(const Duration(milliseconds: 500));
-    return "id,name,status\n1,Player One,active";
+    final response = await _api.get('/admin/participants/export');
+    return response.data.toString();
   }
 }

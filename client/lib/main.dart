@@ -22,12 +22,15 @@ import 'package:tournament_app/features/payment/presentation/checkout_screen.dar
 import 'package:tournament_app/features/payment/presentation/payment_screens.dart';
 import 'package:tournament_app/features/admin/presentation/admin_dashboard_screen.dart';
 import 'package:tournament_app/features/admin/presentation/create_tournament_screen.dart';
+import 'package:tournament_app/features/admin/bloc/admin_bloc.dart';
+import 'package:tournament_app/features/admin/data/admin_repository.dart';
 import 'package:tournament_app/features/profile/presentation/profile_screen.dart';
 
 final _api = ApiClient();
 final _tournamentRepo = TournamentRepository(_api);
 final _paymentRepo = PaymentRepository(_api);
 final _liveboardRepo = LiveboardRepository(_api);
+final _adminRepo = AdminRepository(_api);
 
 final _router = GoRouter(
   initialLocation: '/login',
@@ -83,11 +86,26 @@ final _router = GoRouter(
         );
       },
     ),
-    GoRoute(path: '/admin', builder: (_, __) => const AdminDashboardScreen()),
-    GoRoute(path: '/admin/tournament/create', builder: (_, __) => const CreateTournamentScreen()),
+    GoRoute(
+      path: '/admin',
+      builder: (_, __) => BlocProvider(
+        create: (_) => AdminBloc(_adminRepo),
+        child: const AdminDashboardScreen(),
+      ),
+    ),
+    GoRoute(
+      path: '/admin/tournament/create',
+      builder: (_, __) => BlocProvider(
+        create: (_) => AdminBloc(_adminRepo),
+        child: const CreateTournamentScreen(),
+      ),
+    ),
     GoRoute(
       path: '/admin/tournament/:id/edit',
-      builder: (_, state) => CreateTournamentScreen(tournamentId: state.pathParameters['id']),
+      builder: (_, state) => BlocProvider(
+        create: (_) => AdminBloc(_adminRepo),
+        child: CreateTournamentScreen(tournamentId: state.pathParameters['id']),
+      ),
     ),
     GoRoute(
       path: '/admin/live/:id',

@@ -13,6 +13,7 @@ const createTournament = Joi.object({
   location: Joi.string().max(255).optional().allow('', null),
   prize_pool_paise: Joi.number().integer().min(0).optional(),
   banner_image_url: Joi.string().uri().optional().allow('', null),
+  status: Joi.string().valid('draft', 'upcoming', 'registration_open', 'registration_closed', 'live', 'completed', 'cancelled').optional(),
 });
 
 const updateTournament = createTournament.fork(Object.keys(createTournament.describe().keys), (s) => s.optional());

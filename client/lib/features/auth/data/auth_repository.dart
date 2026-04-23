@@ -66,8 +66,8 @@ class AuthRepository {
     );
 
     // Store dummy tokens
-    await SecureStorage.saveAccessToken('dummy_access_token_${DateTime.now().millisecondsSinceEpoch}');
-    await SecureStorage.saveRefreshToken('dummy_refresh_token_${DateTime.now().millisecondsSinceEpoch}');
+    await SecureStorage.saveAccessToken('dummy_access_token_${role}_${DateTime.now().millisecondsSinceEpoch}');
+    await SecureStorage.saveRefreshToken('dummy_refresh_token_${role}_${DateTime.now().millisecondsSinceEpoch}');
     await SecureStorage.saveUserRole(dummyUser.role);
     await SecureStorage.saveUserId(dummyUser.id);
 
@@ -81,8 +81,12 @@ class AuthRepository {
     } catch (_) {
       // Continue with local cleanup even if API call fails
     }
+    try {
+      await _googleSignIn.signOut();
+    } catch (_) {
+      // Ignore google sign out errors
+    }
     
-    await _googleSignIn.signOut();
     await SecureStorage.clearAll();
   }
 

@@ -1,8 +1,11 @@
+import 'package:flutter/foundation.dart';
+
 abstract class ApiConstants {
   // Base URL - Update this based on your deployment
-  // Local development: 'http://localhost:3000/api'
-  // Production: 'https://your-backend-domain.com/api'
-  static const String baseUrl = 'http://localhost:3000/api';
+  static String get baseUrl {
+    if (kIsWeb) return 'http://localhost:3000/api';
+    return 'http://10.0.2.2:3000/api'; // Default for mobile (Android emulator)
+  }
 
   // Auth
   static const String authGoogle = '/auth/google';
@@ -28,8 +31,10 @@ abstract class ApiConstants {
       '/liveboard/$tournamentId';
   static String liveboardByRound(String tournamentId, String roundId) =>
       '/liveboard/$tournamentId/round/$roundId';
-  static String liveboardWs(String tournamentId) =>
-      'ws://localhost:3000/ws/tournament/$tournamentId';
+  static String liveboardWs(String tournamentId) {
+    final host = kIsWeb ? 'localhost:3000' : '10.0.2.2:3000';
+    return 'ws://$host/ws/tournament/$tournamentId';
+  }
 
   // Admin
   static const String adminTournaments = '/admin/tournaments';

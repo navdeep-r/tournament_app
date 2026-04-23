@@ -8,6 +8,8 @@ import '../../../core/theme/app_typography.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/cream_scaffold.dart';
 import '../../../shared/widgets/gold_button.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import '../bloc/admin_bloc.dart';
 
 class CreateTournamentScreen extends StatefulWidget {
   final String? tournamentId; // null = create, non-null = edit
@@ -28,7 +30,6 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
   DateTime? _startDateTime;
   DateTime? _registrationDeadline;
   File? _bannerImage;
-  bool _isSaving = false;
 
   final List<_RoundEntry> _rounds = [
     _RoundEntry(name: 'Round 1', description: ''),
@@ -91,39 +92,65 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
     });
   }
 
-  Future<void> _save() async {
+  void _save() {
     if (!_formKey.currentState!.validate()) return;
     if (_startDateTime == null) {
       showErrorSnackbar(context, 'Please set a start date and time.');
       return;
     }
-    setState(() => _isSaving = true);
-    await Future.delayed(const Duration(seconds: 1)); // Simulated API call
-    setState(() => _isSaving = false);
-    if (mounted) {
-      showSuccessSnackbar(
-          context, isEdit ? 'Tournament updated!' : 'Tournament created!');
-      context.pop();
+
+    final data = {
+      'name': _nameController.text.trim(),
+      'description': _descController.text.trim(),
+      'max_participants': int.tryParse(_maxParticipantsController.text.trim()) ?? 500,
+      'entry_fee_paise': int.tryParse(_entryFeeController.text.trim()) ?? 0,
+      'rules': _rulesController.text.trim(),
+      'starts_at': _startDateTime!.toIso8601String(),
+    };
+    if (_registrationDeadline != null) {
+      data['registration_closes_at'] = _registrationDeadline!.toIso8601String();
+    }
+
+    if (isEdit) {
+      context.read<AdminBloc>().add(AdminTournamentUpdateRequested(widget.tournamentId!, data));
+    } else {
+      context.read<AdminBloc>().add(AdminTournamentCreateRequested(data));
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return CreamScaffold(
-      appBar: AppBar(
-        title: Text(isEdit ? 'Edit Tournament' : 'New Tournament',
-            style: AppTypography.titleLarge),
-        leading: IconButton(
-          icon: const Icon(Icons.close_rounded),
-          onPressed: () {
-            if (context.canPop()) {
-              context.pop();
-            } else {
-              context.go('/home');
-            }
-          },
-        ),
-      ),
+    return BlocConsumer<AdminBloc, AdminState>(
+      listenWhen: (prev, current) => current is AdminOperationSuccess || current is AdminError,
+      listener: (context, state) {
+        if (state is AdminOperationSuccess) {
+          showSuccessSnackbar(context, state.message);
+          if (context.canPop()) {
+            context.pop();
+          } else {
+            context.go('/admin');
+          }
+        } else if (state is AdminError) {
+          showErrorSnackbar(context, state.message);
+        }
+      },
+      builder: (context, state) {
+        final _isSaving = state is AdminOperationInProgress;
+        return CreamScaffold(
+          appBar: AppBar(
+            title: Text(isEdit ? 'Edit Tournament' : 'New Tournament',
+                style: AppTypography.titleLarge),
+            leading: IconButton(
+              icon: const Icon(Icons.close_rounded),
+              onPressed: () {
+                if (context.canPop()) {
+                  context.pop();
+                } else {
+                  context.go('/admin');
+                }
+              },
+            ),
+          ),
       body: Form(
         key: _formKey,
         child: ListView(
@@ -252,6 +279,7 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
         ),
       ),
     );
+    });
   }
 }
 

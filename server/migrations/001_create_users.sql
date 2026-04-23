@@ -2,7 +2,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 CREATE TABLE IF NOT EXISTS users (
   id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  google_id       VARCHAR(128) UNIQUE,
+  google_id       VARCHAR(255) UNIQUE,
   phone           VARCHAR(20) UNIQUE,
   phone_verified  BOOLEAN NOT NULL DEFAULT FALSE,
   name            VARCHAR(255),
@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS users (
   role            VARCHAR(20) NOT NULL DEFAULT 'user'
                     CHECK (role IN ('user', 'admin')),
   is_active       BOOLEAN NOT NULL DEFAULT TRUE,
-  firebase_uid    VARCHAR(128) UNIQUE,
+  firebase_uid    VARCHAR(255) UNIQUE,
   refresh_token   TEXT,
   last_login_at   TIMESTAMPTZ,
   created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
