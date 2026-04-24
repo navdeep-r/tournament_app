@@ -235,8 +235,10 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
                     RegistrationSection(
                       tournament: t,
                       isRegistered: state.isRegistered,
-                      onRegister: () =>
-                          context.push('/tournament/${t.id}/checkout'),
+                      onRegister: () => context.pushNamed(
+                        'checkout',
+                        pathParameters: {'id': t.id},
+                      ),
                     ),
                     const SizedBox(height: 32),
                   ],

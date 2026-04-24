@@ -3,9 +3,10 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pin_code_fields/pin_code_fields.dart';
-import 'package:dotted_border/dotted_border.dart';
+
 import 'package:tournament_app/features/payment/bloc/payment_bloc.dart';
 import 'package:tournament_app/features/payment/data/models/payment_models.dart';
+import 'package:tournament_app/features/payment/presentation/widgets/checkout_sections.dart';
 import 'package:tournament_app/core/theme/app_colors.dart';
 import 'package:tournament_app/core/theme/app_typography.dart';
 import 'package:tournament_app/core/theme/app_theme.dart';
@@ -14,6 +15,7 @@ import 'package:tournament_app/shared/widgets/gold_button.dart';
 
 class CheckoutScreen extends StatefulWidget {
   final String tournamentId;
+
   const CheckoutScreen({super.key, required this.tournamentId});
 
   @override
@@ -36,8 +38,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   void _goToPage(int page) {
-    _pageController.animateToPage(page,
-        duration: const Duration(milliseconds: 350), curve: Curves.easeInOut);
+    _pageController.animateToPage(
+      page,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+    );
   }
 
   @override
@@ -45,10 +50,21 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     return BlocListener<PaymentBloc, PaymentState>(
       listener: (context, state) {
         _goToPage(state.currentStep);
+
         if (state.status == PaymentStatus.success) {
-          context.go('/payment/success');
-        } else if (state.status == PaymentStatus.failure) {
-          context.go('/payment/failure');
+          context.goNamed('payment-success');
+          return;
+        }
+
+        if (state.status == PaymentStatus.failure) {
+          context.goNamed('payment-failure');
+          return;
+        }
+
+        if (state.errorMessage != null && state.errorMessage!.isNotEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(state.errorMessage!)),
+          );
         }
       },
       child: CreamScaffold(
@@ -57,11 +73,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           leading: IconButton(
             icon: const Icon(Icons.arrow_back_ios_new_rounded),
             onPressed: () {
-              // Use GoRouter's pop which properly handles the navigation stack
               if (context.canPop()) {
                 context.pop();
               } else {
-                // Fallback: navigate back to tournament detail
                 context.go('/home');
               }
             },
@@ -73,20 +87,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             BlocBuilder<PaymentBloc, PaymentState>(
               builder: (_, s) => _StepIndicator(currentStep: s.currentStep),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 20),
             Expanded(
               child: PageView(
                 controller: _pageController,
                 physics: const NeverScrollableScrollPhysics(),
                 children: [
-                  _Step1Phone(onNext: () => _goToPage(1)),
-                  _Step2Referral(
-                    onNext: () =>
-                        context.read<PaymentBloc>().add(PaymentCreateOrder()),
-                    onSkip: () =>
-                        context.read<PaymentBloc>().add(PaymentCreateOrder()),
-                  ),
-                  _Step3Payment(),
+                  _StepPhoneOtp(onNext: () => _goToPage(1)),
+                  _StepReferral(onNext: () => context.read<PaymentBloc>().add(PaymentCreateOrder())),
+                  const _StepPayment(),
                 ],
               ),
             ),
@@ -97,9 +106,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 }
 
-// ─── Step Indicator ───────────────────────────────────────────────────────────
 class _StepIndicator extends StatelessWidget {
   final int currentStep;
+
   const _StepIndicator({required this.currentStep});
 
   @override
@@ -110,11 +119,12 @@ class _StepIndicator extends StatelessWidget {
         children: List.generate(3, (i) {
           final isDone = i < currentStep;
           final isActive = i == currentStep;
+
           return Expanded(
             child: Row(
               children: [
                 AnimatedContainer(
-                  duration: const Duration(milliseconds: 300),
+                  duration: const Duration(milliseconds: 250),
                   width: 32,
                   height: 32,
                   decoration: BoxDecoration(
@@ -136,22 +146,20 @@ class _StepIndicator extends StatelessWidget {
                   child: Center(
                     child: isDone
                         ? const Icon(Icons.check, color: Colors.white, size: 16)
-                        : Text('${i + 1}',
+                        : Text(
+                            '${i + 1}',
                             style: AppTypography.labelMedium.copyWith(
-                              color: isActive
-                                  ? Colors.white
-                                  : AppColors.textSecondary,
+                              color: isActive ? Colors.white : AppColors.textSecondary,
                               fontWeight: FontWeight.w700,
-                            )),
+                            ),
+                          ),
                   ),
                 ),
                 if (i < 2)
                   Expanded(
                     child: Container(
                       height: 1.5,
-                      color: i < currentStep
-                          ? AppColors.success
-                          : AppColors.divider,
+                      color: i < currentStep ? AppColors.success : AppColors.divider,
                     ),
                   ),
               ],
@@ -163,39 +171,10 @@ class _StepIndicator extends StatelessWidget {
   }
 }
 
-// ─── Step 1: Phone + OTP ──────────────────────────────────────────────────────
-class _Step1Phone extends StatefulWidget {
+class _StepPhoneOtp extends StatelessWidget {
   final VoidCallback onNext;
-  const _Step1Phone({required this.onNext});
 
-  @override
-  State<_Step1Phone> createState() => _Step1PhoneState();
-}
-
-class _Step1PhoneState extends State<_Step1Phone>
-    with SingleTickerProviderStateMixin {
-  final _phoneController = TextEditingController();
-  late AnimationController _shakeController;
-  late Animation<double> _shakeAnimation;
-  bool _otpSent = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _shakeController = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 500));
-    _shakeAnimation = Tween<double>(begin: 0, end: 1).animate(
-        CurvedAnimation(parent: _shakeController, curve: Curves.elasticIn));
-  }
-
-  @override
-  void dispose() {
-    _phoneController.dispose();
-    _shakeController.dispose();
-    super.dispose();
-  }
-
-  void _shake() => _shakeController.forward(from: 0);
+  const _StepPhoneOtp({required this.onNext});
 
   @override
   Widget build(BuildContext context) {
@@ -206,124 +185,92 @@ class _Step1PhoneState extends State<_Step1Phone>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Enter your mobile number',
-                  style: AppTypography.headlineMedium),
+              Text('Verify mobile number', style: AppTypography.headlineMedium),
               const SizedBox(height: 6),
-              Text('Your queue number will be linked to this number',
-                  style: AppTypography.bodySmall),
-              const SizedBox(height: 28),
+              Text('Queue number and updates will use this number.', style: AppTypography.bodySmall),
+              const SizedBox(height: 24),
 
-              // Phone input
               Container(
                 decoration: BoxDecoration(
                   color: AppColors.surface,
                   borderRadius: AppTheme.chipRadius,
                   border: Border.all(
-                    color: state.isPhoneValid
-                        ? AppColors.success
-                        : AppColors.divider,
+                    color: state.isPhoneValid ? AppColors.success : AppColors.divider,
                   ),
                 ),
                 child: Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 16),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
                       decoration: const BoxDecoration(
-                        border: Border(
-                            right: BorderSide(color: AppColors.divider)),
+                        border: Border(right: BorderSide(color: AppColors.divider)),
                       ),
-                      child: Text('+91',
-                          style: AppTypography.labelLarge
-                              .copyWith(color: AppColors.textSecondary)),
+                      child: Text(
+                        '+91',
+                        style: AppTypography.labelLarge.copyWith(color: AppColors.textSecondary),
+                      ),
                     ),
                     Expanded(
                       child: TextField(
-                        controller: _phoneController,
                         keyboardType: TextInputType.number,
                         maxLength: 10,
-                        inputFormatters: [
-                          FilteringTextInputFormatter.digitsOnly
-                        ],
+                        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                         decoration: const InputDecoration(
                           border: InputBorder.none,
                           counterText: '',
                           hintText: 'XXXXX XXXXX',
-                          contentPadding:
-                              EdgeInsets.symmetric(horizontal: 12),
+                          contentPadding: EdgeInsets.symmetric(horizontal: 12),
                         ),
-                        onChanged: (v) => context
-                            .read<PaymentBloc>()
-                            .add(PaymentPhoneChanged(v)),
+                        onChanged: (v) => context.read<PaymentBloc>().add(PaymentPhoneChanged(v)),
                       ),
                     ),
                     if (state.isPhoneValid)
                       const Padding(
                         padding: EdgeInsets.only(right: 12),
-                        child: Icon(Icons.check_circle_rounded,
-                            color: AppColors.success, size: 20),
+                        child: Icon(Icons.check_circle_rounded, color: AppColors.success, size: 20),
                       ),
                   ],
                 ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
 
               if (!state.isOtpSent)
                 GoldButton(
                   label: 'Send OTP',
                   onPressed: state.isPhoneValid
-                      ? () {
-                          context.read<PaymentBloc>().add(
-                                PaymentSendOtpRequested(state.phone),
-                              );
-                        }
+                      ? () => context.read<PaymentBloc>().add(PaymentSendOtpRequested(state.phone))
                       : null,
                   isLoading: state.status == PaymentStatus.phoneVerification,
                 )
               else ...[
-                Text('Enter 6-digit OTP',
-                    style: AppTypography.labelLarge),
+                Text('Enter 6-digit OTP', style: AppTypography.labelLarge),
                 const SizedBox(height: 12),
-                AnimatedBuilder(
-                  animation: _shakeAnimation,
-                  builder: (_, child) {
-                    final shake =
-                        (_shakeAnimation.value * 10 * 3.14159).abs();
-                    return Transform.translate(
-                      offset: Offset(8 * shake, 0),
-                      child: child,
-                    );
-                  },
-                  child: PinCodeTextField(
-                    appContext: context,
-                    length: 6,
-                    keyboardType: TextInputType.number,
-                    animationType: AnimationType.fade,
-                    pinTheme: PinTheme(
-                      shape: PinCodeFieldShape.box,
-                      borderRadius: AppTheme.chipRadius,
-                      fieldHeight: 52,
-                      fieldWidth: 44,
-                      activeColor: AppColors.primaryBrand,
-                      inactiveColor: AppColors.divider,
-                      selectedColor: AppColors.primaryBrand,
-                    ),
-                    onCompleted: (otp) {
-                      // Auto-verify
-                      context.read<PaymentBloc>().add(PaymentOtpVerified());
-                      widget.onNext();
-                    },
-                    onChanged: (v) =>
-                        context.read<PaymentBloc>().add(PaymentOtpChanged(v)),
+                PinCodeTextField(
+                  appContext: context,
+                  length: 6,
+                  keyboardType: TextInputType.number,
+                  animationType: AnimationType.fade,
+                  pinTheme: PinTheme(
+                    shape: PinCodeFieldShape.box,
+                    borderRadius: AppTheme.chipRadius,
+                    fieldHeight: 52,
+                    fieldWidth: 44,
+                    activeColor: AppColors.primaryBrand,
+                    inactiveColor: AppColors.divider,
+                    selectedColor: AppColors.primaryBrand,
                   ),
+                  onChanged: (v) => context.read<PaymentBloc>().add(PaymentOtpChanged(v)),
+                  onCompleted: (_) {
+                    context.read<PaymentBloc>().add(PaymentOtpVerified());
+                    onNext();
+                  },
                 ),
                 TextButton(
-                  onPressed: () => context.read<PaymentBloc>().add(
-                        PaymentSendOtpRequested(state.phone),
-                      ),
-                  child: Text('Resend OTP',
-                      style: AppTypography.labelMedium
-                          .copyWith(color: AppColors.primaryBrand)),
+                  onPressed: () => context.read<PaymentBloc>().add(PaymentSendOtpRequested(state.phone)),
+                  child: Text(
+                    'Resend OTP',
+                    style: AppTypography.labelMedium.copyWith(color: AppColors.primaryBrand),
+                  ),
                 ),
               ],
             ],
@@ -334,17 +281,16 @@ class _Step1PhoneState extends State<_Step1Phone>
   }
 }
 
-// ─── Step 2: Referral Code ────────────────────────────────────────────────────
-class _Step2Referral extends StatefulWidget {
+class _StepReferral extends StatefulWidget {
   final VoidCallback onNext;
-  final VoidCallback onSkip;
-  const _Step2Referral({required this.onNext, required this.onSkip});
+
+  const _StepReferral({required this.onNext});
 
   @override
-  State<_Step2Referral> createState() => _Step2ReferralState();
+  State<_StepReferral> createState() => _StepReferralState();
 }
 
-class _Step2ReferralState extends State<_Step2Referral> {
+class _StepReferralState extends State<_StepReferral> {
   final _codeController = TextEditingController();
 
   @override
@@ -364,112 +310,47 @@ class _Step2ReferralState extends State<_Step2Referral> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Have a referral code?',
-                  style: AppTypography.headlineMedium),
+              Text('Referral / Discount', style: AppTypography.headlineMedium),
               const SizedBox(height: 6),
-              Text('Apply to get a discount on entry fee',
-                  style: AppTypography.bodySmall),
-              const SizedBox(height: 28),
+              Text('Apply code to update your final payable amount.', style: AppTypography.bodySmall),
+              const SizedBox(height: 24),
 
-              // Dotted border input
-              DottedBorder(
-                color: hasApplied
-                    ? AppColors.success
-                    : state.referralError != null
-                        ? AppColors.error
-                        : AppColors.primaryBrand,
-                strokeWidth: 1.5,
-                dashPattern: const [8, 4],
-                borderType: BorderType.RRect,
-                radius: const Radius.circular(8),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _codeController,
-                          textCapitalization: TextCapitalization.characters,
-                          maxLength: 12,
-                          decoration: const InputDecoration(
-                            border: InputBorder.none,
-                            counterText: '',
-                            hintText: 'e.g. FRIEND2024',
-                          ),
-                          style: AppTypography.labelLarge.copyWith(
-                              letterSpacing: 4),
-                          onChanged: (v) => context
-                              .read<PaymentBloc>()
-                              .add(PaymentReferralCodeChanged(v)),
-                        ),
-                      ),
-                      if (state.isValidatingReferral)
-                        const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2, color: AppColors.primaryBrand),
-                        )
-                      else if (hasApplied)
-                        GestureDetector(
-                          onTap: () {
-                            _codeController.clear();
-                            context.read<PaymentBloc>().add(PaymentReferralRemoved());
-                          },
-                          child: const Icon(Icons.close,
-                              color: AppColors.textSecondary, size: 20),
-                        )
-                      else
-                        TextButton(
-                          onPressed: () => context.read<PaymentBloc>().add(
-                              PaymentReferralSubmitted(_codeController.text)),
-                          child: Text('Apply',
-                              style: AppTypography.labelLarge
-                                  .copyWith(color: AppColors.primaryBrand)),
-                        ),
-                    ],
-                  ),
-                ),
+              CheckoutReferralSection(
+                controller: _codeController,
+                hasApplied: hasApplied,
+                isValidating: state.isValidatingReferral,
+                errorText: state.referralError,
+                onApply: () => context.read<PaymentBloc>().add(PaymentReferralSubmitted(_codeController.text)),
+                onClear: () {
+                  _codeController.clear();
+                  context.read<PaymentBloc>().add(PaymentReferralRemoved());
+                },
               ),
 
-              if (state.referralError != null) ...[
-                const SizedBox(height: 8),
-                Text(state.referralError!,
-                    style: AppTypography.caption
-                        .copyWith(color: AppColors.error)),
-              ],
               if (hasApplied) ...[
-                const SizedBox(height: 8),
-                Text(
-                  'Referral code applied successfully.',
-                  style: AppTypography.caption.copyWith(color: AppColors.success),
-                ),
-              ],
-
-              // Price breakdown animated
-              if (hasApplied) ...[
-                const SizedBox(height: 20),
-                _PriceBreakdownCard(
-                  original: state.originalAmountPaise,
-                  discount: state.discountAmountPaise,
-                  final_: state.finalAmountPaise,
+                const SizedBox(height: 16),
+                CheckoutPricingBreakdownSection(
+                  originalPaise: state.originalAmountPaise,
+                  discountPaise: state.discountAmountPaise,
+                  finalPaise: state.finalAmountPaise,
                   code: state.referralCode,
                 ),
               ],
 
-              const SizedBox(height: 28),
+              const SizedBox(height: 24),
               GoldButton(
                 label: hasApplied ? 'Apply & Continue' : 'Continue',
                 onPressed: widget.onNext,
                 isLoading: state.status == PaymentStatus.creatingOrder,
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
               Center(
                 child: TextButton(
-                  onPressed: widget.onSkip,
-                  child: Text('Continue without code',
-                      style: AppTypography.bodySmall
-                          .copyWith(color: AppColors.textSecondary)),
+                  onPressed: widget.onNext,
+                  child: Text(
+                    'Continue without code',
+                    style: AppTypography.bodySmall.copyWith(color: AppColors.textSecondary),
+                  ),
                 ),
               ),
             ],
@@ -480,66 +361,9 @@ class _Step2ReferralState extends State<_Step2Referral> {
   }
 }
 
-class _PriceBreakdownCard extends StatelessWidget {
-  final int original, discount, final_;
-  final String code;
-  const _PriceBreakdownCard(
-      {required this.original,
-      required this.discount,
-      required this.final_,
-      required this.code});
+class _StepPayment extends StatelessWidget {
+  const _StepPayment();
 
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedSize(
-      duration: const Duration(milliseconds: 300),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: AppColors.success.withOpacity(0.06),
-          borderRadius: AppTheme.cardRadius,
-          border: Border.all(color: AppColors.success.withOpacity(0.3)),
-        ),
-        child: Column(
-          children: [
-            _Row('Original', '₹${(original / 100).toStringAsFixed(2)}'),
-            const SizedBox(height: 6),
-            _Row('Discount ($code)', '-₹${(discount / 100).toStringAsFixed(2)}',
-                valueColor: AppColors.success),
-            const Divider(height: 20),
-            _Row('Total', '₹${(final_ / 100).toStringAsFixed(2)}',
-                bold: true),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _Row extends StatelessWidget {
-  final String label, value;
-  final Color? valueColor;
-  final bool bold;
-  const _Row(this.label, this.value, {this.valueColor, this.bold = false});
-
-  @override
-  Widget build(BuildContext context) {
-    final style = bold ? AppTypography.labelLarge : AppTypography.bodySmall;
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(label, style: style),
-        Text(value,
-            style: style.copyWith(
-                color: valueColor,
-                fontWeight: bold ? FontWeight.w700 : null)),
-      ],
-    );
-  }
-}
-
-// ─── Step 3: Payment Methods ──────────────────────────────────────────────────
-class _Step3Payment extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<PaymentBloc, PaymentState>(
@@ -549,193 +373,47 @@ class _Step3Payment extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Choose payment method',
-                  style: AppTypography.headlineMedium),
-              const SizedBox(height: 20),
+              Text('Review & Pay', style: AppTypography.headlineMedium),
+              const SizedBox(height: 16),
 
-              // Order summary
-              _OrderSummaryCard(state: state),
-              const SizedBox(height: 20),
+              CheckoutOrderSummarySection(state: state),
+              const SizedBox(height: 16),
 
-              // Payment methods
-              ...state.availableMethods.map((method) =>
-                  _PaymentMethodTile(
-                    method: method,
-                    isSelected: state.selectedMethod == method.type,
-                    onTap: method.isInstalled
-                        ? () => context
-                            .read<PaymentBloc>()
-                            .add(PaymentMethodSelected(method.type))
-                        : null,
-                  )),
-
-              const SizedBox(height: 24),
-              GoldButton(
-                label: 'Pay ${state.formattedFinalAmount}',
-                onPressed: state.selectedMethod != null &&
-                        state.status != PaymentStatus.processing
-                    ? () => context
-                        .read<PaymentBloc>()
-                        .add(PaymentInitiateRequested())
-                    : null,
-                isLoading: state.status == PaymentStatus.processing,
+              CheckoutPricingBreakdownSection(
+                originalPaise: state.originalAmountPaise,
+                discountPaise: state.discountAmountPaise,
+                finalPaise: state.finalAmountPaise,
+                code: state.referralCode,
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 16),
+
+              CheckoutPaymentMethodSection(
+                methods: state.availableMethods,
+                selected: state.selectedMethod,
+                onSelect: (method) => context.read<PaymentBloc>().add(PaymentMethodSelected(method)),
+              ),
+
+              const SizedBox(height: 20),
+              CheckoutConfirmButton(
+                amountText: state.formattedFinalAmount,
+                isLoading: state.status == PaymentStatus.processing,
+                canProceed: state.selectedMethod != null && state.status != PaymentStatus.processing,
+                onPressed: () => context.read<PaymentBloc>().add(PaymentInitiateRequested()),
+              ),
+              const SizedBox(height: 10),
+
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.lock_outlined,
-                      size: 14, color: AppColors.textSecondary),
+                  const Icon(Icons.lock_outline, size: 14, color: AppColors.textSecondary),
                   const SizedBox(width: 4),
-                  Text('256-bit SSL  ·  Powered by Razorpay',
-                      style: AppTypography.caption),
+                  Text('Secure checkout powered by Razorpay', style: AppTypography.caption),
                 ],
               ),
-              const SizedBox(height: 24),
             ],
           ),
         );
       },
     );
-  }
-}
-
-class _OrderSummaryCard extends StatelessWidget {
-  final PaymentState state;
-  const _OrderSummaryCard({required this.state});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: AppTheme.cardDecoration,
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                  child: Text(
-                      state.currentOrder?.tournamentName ?? 'Tournament',
-                      style: AppTypography.labelLarge)),
-              Text(state.formattedFinalAmount,
-                  style: AppTypography.headlineSmall
-                      .copyWith(color: AppColors.primaryBrand)),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              const Icon(Icons.phone_outlined,
-                  size: 14, color: AppColors.textSecondary),
-              const SizedBox(width: 4),
-              Text('+91 ${state.phone}',
-                  style: AppTypography.caption),
-            ],
-          ),
-          if (state.discountAmountPaise > 0) ...[
-            const SizedBox(height: 4),
-            Row(
-              children: [
-                const Icon(Icons.local_offer_outlined,
-                    size: 14, color: AppColors.success),
-                const SizedBox(width: 4),
-                Text(
-                  'Saved ₹${(state.discountAmountPaise / 100).toStringAsFixed(2)}',
-                    style: AppTypography.caption
-                        .copyWith(color: AppColors.success)),
-              ],
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _PaymentMethodTile extends StatelessWidget {
-  final PaymentMethod method;
-  final bool isSelected;
-  final VoidCallback? onTap;
-
-  const _PaymentMethodTile(
-      {required this.method, required this.isSelected, this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? AppColors.primaryBrand.withOpacity(0.06)
-              : AppColors.surface,
-          borderRadius: AppTheme.cardRadius,
-          border: Border(
-            left: BorderSide(
-              color: isSelected ? AppColors.primaryBrand : Colors.transparent,
-              width: 3,
-            ),
-            top: BorderSide(color: AppColors.divider, width: 0.5),
-            right: BorderSide(color: AppColors.divider, width: 0.5),
-            bottom: BorderSide(color: AppColors.divider, width: 0.5),
-          ),
-        ),
-        child: Row(
-          children: [
-            Radio<bool>(
-              value: true,
-              groupValue: isSelected,
-              activeColor: AppColors.primaryBrand,
-              onChanged: onTap != null ? (_) => onTap!() : null,
-            ),
-            const SizedBox(width: 4),
-            _methodIcon(method.type),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(method.displayName, style: AppTypography.labelLarge),
-                  Text(method.subtitle, style: AppTypography.caption),
-                ],
-              ),
-            ),
-            if (method.isRecommended && method.isInstalled)
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: AppColors.success.withOpacity(0.1),
-                  borderRadius: AppTheme.chipRadius,
-                ),
-                child: Text('RECOMMENDED',
-                    style: AppTypography.labelSmall
-                        .copyWith(color: AppColors.success, fontSize: 9)),
-              )
-            else if (!method.isInstalled)
-              Text('Not installed',
-                  style: AppTypography.caption.copyWith(
-                      color: AppColors.eliminated, fontSize: 10)),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _methodIcon(PaymentMethodType type) {
-    final (icon, color) = switch (type) {
-      PaymentMethodType.googlePay => (Icons.g_mobiledata, Colors.blue),
-      PaymentMethodType.phonePe => (Icons.phone_android, const Color(0xFF5F259F)),
-      PaymentMethodType.paytm => (Icons.account_balance_wallet, Colors.blue),
-      PaymentMethodType.bhimUpi => (Icons.qr_code_scanner, const Color(0xFF5F259F)),
-      PaymentMethodType.razorpayCard => (Icons.credit_card, AppColors.textPrimary),
-      PaymentMethodType.netBanking => (Icons.account_balance, AppColors.textPrimary),
-      _ => (Icons.payment, AppColors.textPrimary),
-    };
-    return Icon(icon, color: color, size: 26);
   }
 }

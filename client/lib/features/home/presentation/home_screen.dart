@@ -145,8 +145,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     isRegistered: registeredTournamentIds.contains(t.id),
                     onViewBoard: () =>
                         context.push('/liveboard/${t.id}'),
-                    onRegister: () =>
-                        context.push('/tournament/${t.id}/checkout'),
+                    onRegister: () => context.pushNamed(
+                      'checkout',
+                      pathParameters: {'id': t.id},
+                    ),
                   ),
                 )),
             const SizedBox(height: 8),
@@ -166,8 +168,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   tournament: state.scheduled[i],
                   isRegistered:
                       registeredTournamentIds.contains(state.scheduled[i].id),
-                  onJoin: () => context
-                      .push('/tournament/${state.scheduled[i].id}/checkout'),
+                  onJoin: () => context.pushNamed(
+                    'checkout',
+                    pathParameters: {'id': state.scheduled[i].id},
+                  ),
                   onTap: () => context
                       .go('/tournament/${state.scheduled[i].id}'),
                 ),

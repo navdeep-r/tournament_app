@@ -65,14 +65,23 @@ final _router = GoRouter(
       },
     ),
     GoRoute(
+      name: 'checkout',
       path: '/tournament/:id/checkout',
       builder: (_, state) {
         final id = state.pathParameters['id']!;
         return CheckoutScreen(tournamentId: id);
       },
     ),
-    GoRoute(path: '/payment/success', builder: (_, __) => const PaymentSuccessScreen()),
-    GoRoute(path: '/payment/failure', builder: (_, __) => const PaymentFailureScreen()),
+    GoRoute(
+      name: 'payment-success',
+      path: '/payment/success',
+      builder: (_, __) => const PaymentSuccessScreen(),
+    ),
+    GoRoute(
+      name: 'payment-failure',
+      path: '/payment/failure',
+      builder: (_, __) => const PaymentFailureScreen(),
+    ),
     GoRoute(
       path: '/liveboard/:id',
       builder: (_, state) {

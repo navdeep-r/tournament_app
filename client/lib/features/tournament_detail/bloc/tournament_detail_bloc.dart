@@ -47,8 +47,17 @@ class TournamentDetailBloc
       Emitter<TournamentDetailState> emit) async {
     emit(TournamentDetailLoading());
     try {
-      final tournament = await _repo.getById(event.tournamentId);
-      emit(TournamentDetailLoaded(tournament: tournament));
+      final results = await Future.wait([
+        _repo.getById(event.tournamentId),
+        _repo.getUserHistory(),
+      ]);
+      final tournament = results[0] as TournamentModel;
+      final history = results[1] as List<ParticipationModel>;
+      final isRegistered = history.any((p) => p.tournamentId == event.tournamentId);
+      emit(TournamentDetailLoaded(
+        tournament: tournament,
+        isRegistered: isRegistered,
+      ));
     } catch (e) {
       emit(TournamentDetailError(e.toString()));
     }
@@ -57,8 +66,17 @@ class TournamentDetailBloc
   Future<void> _onRefresh(TournamentDetailRefreshRequested event,
       Emitter<TournamentDetailState> emit) async {
     try {
-      final tournament = await _repo.getById(event.tournamentId);
-      emit(TournamentDetailLoaded(tournament: tournament));
+      final results = await Future.wait([
+        _repo.getById(event.tournamentId),
+        _repo.getUserHistory(),
+      ]);
+      final tournament = results[0] as TournamentModel;
+      final history = results[1] as List<ParticipationModel>;
+      final isRegistered = history.any((p) => p.tournamentId == event.tournamentId);
+      emit(TournamentDetailLoaded(
+        tournament: tournament,
+        isRegistered: isRegistered,
+      ));
     } catch (_) {
       // Keep existing state on refresh failure
     }
