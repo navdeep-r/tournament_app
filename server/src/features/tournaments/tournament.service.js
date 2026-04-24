@@ -78,11 +78,8 @@ class TournamentService {
   async delete(id) {
     const tournament = await this.tournamentRepo.findById(id);
     if (!tournament) throw new NotFoundError('Tournament not found');
-    const currentStatus = tournament.effective_status || tournament.status;
-    if (['live', 'completed'].includes(currentStatus)) {
-      throw new BadRequestError('Cannot delete active or completed tournament');
-    }
-    return this.tournamentRepo.update(id, { status: 'cancelled' });
+    await this.tournamentRepo.hardDelete(id);
+    return true;
   }
 
   _normalizeReferralCodes(referralCodes) {

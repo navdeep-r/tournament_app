@@ -120,6 +120,14 @@ class TournamentRepository {
     );
     return rows;
   }
+
+  async hardDelete(id) {
+    const { rowCount } = await this.query(
+      'DELETE FROM tournaments WHERE id = $1',
+      [id]
+    );
+    return rowCount > 0;
+  }
 }
 
 module.exports = TournamentRepository;
