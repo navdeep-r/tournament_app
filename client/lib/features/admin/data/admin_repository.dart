@@ -7,6 +7,38 @@ class AdminRepository {
   final ApiClient _api;
   AdminRepository(this._api);
 
+  Exception _buildDioException(DioException e, String fallbackMessage) {
+    final payload = e.response?.data;
+    if (payload is Map<String, dynamic>) {
+      final error = payload['error'];
+      if (error is Map<String, dynamic>) {
+        final message = error['message']?.toString();
+        final details = error['details'];
+        if (details is List) {
+          final detailText = details
+              .whereType<Map<String, dynamic>>()
+              .map((d) => d['message']?.toString())
+              .whereType<String>()
+              .where((m) => m.trim().isNotEmpty)
+              .join(', ');
+          if (detailText.isNotEmpty) {
+            return Exception(message != null && message.isNotEmpty
+                ? '$message: $detailText'
+                : detailText);
+          }
+        }
+        if (message != null && message.isNotEmpty) {
+          return Exception(message);
+        }
+      }
+      final rootMessage = payload['message']?.toString();
+      if (rootMessage != null && rootMessage.isNotEmpty) {
+        return Exception(rootMessage);
+      }
+    }
+    return Exception(fallbackMessage);
+  }
+
   // Tournaments CRUD
   Future<List<dynamic>> getTournaments() async {
     final response = await _api.get(ApiConstants.adminTournaments);
@@ -21,8 +53,12 @@ class AdminRepository {
   Future<Map<String, dynamic>> createTournament(
       Map<String, dynamic> data) async {
     final payload = {...data, 'status': 'upcoming'};
-    final response = await _api.post(ApiConstants.tournaments, data: payload);
-    return response.data['data'] as Map<String, dynamic>;
+    try {
+      final response = await _api.post(ApiConstants.tournaments, data: payload);
+      return response.data['data'] as Map<String, dynamic>;
+    } on DioException catch (e) {
+      throw _buildDioException(e, 'Failed to create tournament');
+    }
   }
 
   Future<Map<String, dynamic>> updateTournament(
@@ -33,13 +69,7 @@ class AdminRepository {
       final response = await _api.put(ApiConstants.tournamentById(id), data: data);
       return response.data['data'] as Map<String, dynamic>;
     } on DioException catch (e) {
-      final payload = e.response?.data;
-      final serverMessage = payload is Map<String, dynamic>
-          ? (payload['error'] is Map<String, dynamic>
-              ? payload['error']['message']?.toString()
-              : payload['message']?.toString())
-          : null;
-      throw Exception(serverMessage ?? 'Failed to update tournament');
+      throw _buildDioException(e, 'Failed to update tournament');
     }
   }
 

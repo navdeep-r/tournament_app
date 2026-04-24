@@ -145,6 +145,18 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
       showErrorSnackbar(context, 'Please set a start date and time.');
       return;
     }
+    if (!_startDateTime!.isAfter(DateTime.now())) {
+      showErrorSnackbar(context, 'Start time must be in the future.');
+      return;
+    }
+    if (_registrationDeadline != null &&
+        !_registrationDeadline!.isBefore(_startDateTime!)) {
+      showErrorSnackbar(
+        context,
+        'Registration deadline must be before start time.',
+      );
+      return;
+    }
     final nonEmptyReferrals = _referrals.where((r) => r.code.trim().isNotEmpty).toList();
     for (final r in nonEmptyReferrals) {
       final code = r.code.trim().toUpperCase();
@@ -300,8 +312,13 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
                     hint: '500',
                     keyboardType: TextInputType.number,
                     inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                    validator: (v) =>
-                        (int.tryParse(v ?? '') ?? 0) > 0 ? null : 'Required',
+                    validator: (v) {
+                      final parsed = int.tryParse(v ?? '');
+                      if (parsed == null) return 'Required';
+                      if (parsed < 2) return 'Must be at least 2';
+                      if (parsed > 10000) return 'Cannot exceed 10000';
+                      return null;
+                    },
                   ),
                 ),
                 const SizedBox(width: 12),

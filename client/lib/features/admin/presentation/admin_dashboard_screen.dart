@@ -177,6 +177,39 @@ class _TournamentsTab extends StatelessWidget {
   final List<dynamic> tournaments;
   const _TournamentsTab({required this.tournaments});
 
+  Future<void> _confirmDelete(BuildContext context, dynamic tournament) async {
+    final id = tournament['id']?.toString();
+    if (id == null || id.isEmpty) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Delete tournament?'),
+        content: Text(
+          'This will permanently delete "${tournament['name'] ?? 'this tournament'}" and related data.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.error),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && context.mounted) {
+      context.read<AdminBloc>().add(AdminTournamentDeleteRequested(id));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Delete requested...')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -207,6 +240,11 @@ class _TournamentsTab extends StatelessWidget {
                   ),
                   const SizedBox(width: 8),
                   IconButton(icon: const Icon(Icons.edit_outlined, color: AppColors.primaryBrand, size: 20), onPressed: () => context.go('/admin/tournament/${t['id']}/edit')),
+                  IconButton(
+                    icon: const Icon(Icons.delete_outline_rounded, color: AppColors.error, size: 20),
+                    tooltip: 'Delete tournament',
+                    onPressed: () => _confirmDelete(context, t),
+                  ),
                 ]),
               );
             },
