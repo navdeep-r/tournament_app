@@ -1,7 +1,10 @@
 import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
+import 'dart:convert';
+import 'dart:io';
 import '../../../core/network/api_client.dart';
 import '../../../core/constants/api_constants.dart';
+import 'package:image_picker/image_picker.dart';
 
 class AdminRepository {
   final ApiClient _api;
@@ -70,6 +73,39 @@ class AdminRepository {
       return response.data['data'] as Map<String, dynamic>;
     } on DioException catch (e) {
       throw _buildDioException(e, 'Failed to update tournament');
+    }
+  }
+
+  Future<String> uploadTournamentBanner(XFile imageFile) async {
+    final path = imageFile.name.toLowerCase();
+    String mimeType = 'image/jpeg';
+    if (path.endsWith('.png')) {
+      mimeType = 'image/png';
+    } else if (path.endsWith('.webp')) {
+      mimeType = 'image/webp';
+    }
+    
+    final bytes = await imageFile.readAsBytes();
+    final base64Image = base64Encode(bytes);
+    final fileName = imageFile.name;
+    try {
+      final response = await _api.post(
+        '/admin/uploads/tournament-banner',
+        data: {
+          'filename': fileName,
+          'content_base64': 'data:$mimeType;base64,$base64Image',
+        },
+      );
+      final data = response.data['data'] as Map<String, dynamic>;
+      final url = data['url']?.toString();
+      if (url == null || url.isEmpty) {
+        throw Exception('Upload succeeded but URL was missing');
+      }
+      return url;
+    } on DioException catch (e) {
+      throw _buildDioException(e, 'Failed to upload banner image');
+    } catch (e) {
+      throw Exception('Failed to upload banner image: $e');
     }
   }
 

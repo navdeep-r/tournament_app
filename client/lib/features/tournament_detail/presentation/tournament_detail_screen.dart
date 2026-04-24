@@ -10,6 +10,7 @@ import 'package:tournament_app/core/theme/app_typography.dart';
 import 'package:tournament_app/core/theme/app_theme.dart';
 import 'package:tournament_app/core/utils/formatters.dart';
 import 'package:tournament_app/shared/widgets/empty_state.dart';
+import 'package:tournament_app/core/constants/asset_constants.dart';
 
 class TournamentDetailScreen extends StatefulWidget {
   final String tournamentId;
@@ -128,12 +129,9 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
                               placeholder: (_, __) =>
                                   Container(color: AppColors.divider),
                             )
-                          : Container(
-                              decoration: const BoxDecoration(
-                                gradient: AppColors.goldGradient,
-                              ),
-                              child: const Icon(Icons.emoji_events_rounded,
-                                  color: Colors.white54, size: 80),
+                          : Image.asset(
+                              AssetConstants.defaultTournamentBanner,
+                              fit: BoxFit.cover,
                             ),
                     ),
                     // Gradient overlay

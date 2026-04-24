@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
-import 'dart:io';
+import 'dart:io' show File, SocketException;
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
@@ -9,6 +10,8 @@ import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/cream_scaffold.dart';
 import '../../../shared/widgets/gold_button.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import '../../../core/constants/asset_constants.dart';
 import '../bloc/admin_bloc.dart';
 
 class CreateTournamentScreen extends StatefulWidget {
@@ -30,8 +33,12 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
 
   DateTime? _startDateTime;
   DateTime? _registrationDeadline;
-  File? _bannerImage;
+  XFile? _bannerImage;
+  String? _existingBannerUrl;
+  String? _bannerError;
   bool _isLoadingExisting = false;
+  bool _isUploadingBanner = false;
+  static const int _maxBannerSizeBytes = 5 * 1024 * 1024;
 
   final List<_RoundEntry> _rounds = [
     _RoundEntry(name: 'Round 1', description: ''),
@@ -66,6 +73,8 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
         if (data['registration_closes_at'] != null) {
           _registrationDeadline = DateTime.tryParse(data['registration_closes_at']);
         }
+        _existingBannerUrl =
+            (data['banner_image_url'] ?? data['banner_url'])?.toString();
         final referralRows = (data['referral_codes'] as List<dynamic>?) ?? const [];
         _referrals
           ..clear()
@@ -97,9 +106,41 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
 
   Future<void> _pickBannerImage() async {
     final picker = ImagePicker();
-    final picked = await picker.pickImage(
-        source: ImageSource.gallery, imageQuality: 85);
-    if (picked != null) setState(() => _bannerImage = File(picked.path));
+    try {
+      final picked = await picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 85,
+      );
+      if (picked == null || !mounted) return;
+      final fileName = picked.name.toLowerCase();
+      if (fileName.contains('.')) {
+        final ext = fileName.split('.').last;
+        const supported = ['jpg', 'jpeg', 'png', 'webp', 'jfif'];
+        if (!supported.contains(ext)) {
+          setState(() => _bannerError = 'Unsupported format. Use JPG, PNG or WebP.');
+          return;
+        }
+      }
+      
+      final fileSize = await picked.length();
+      if (fileSize > _maxBannerSizeBytes) {
+        setState(() => _bannerError = 'Image must be 5 MB or smaller.');
+        return;
+      }
+      setState(() {
+        _bannerImage = picked;
+        _bannerError = null;
+      });
+    } on PlatformException catch (e) {
+      if (!mounted) return;
+      showErrorSnackbar(
+        context,
+        'Image access was denied or unavailable: ${e.message ?? 'permission error'}',
+      );
+    } catch (e) {
+      if (!mounted) return;
+      showErrorSnackbar(context, 'Failed to pick image: $e');
+    }
   }
 
   Future<void> _pickDateTime({required bool isDeadline}) async {
@@ -140,7 +181,7 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
     });
   }
 
-  void _save() {
+  Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
     if (_startDateTime == null) {
       showErrorSnackbar(context, 'Please set a start date and time.');
@@ -206,6 +247,36 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
     if (_registrationDeadline != null) {
       data['registration_closes_at'] = _registrationDeadline!.toIso8601String();
     }
+    if (_bannerError != null) {
+      showErrorSnackbar(context, _bannerError!);
+      return;
+    }
+
+    if (_bannerImage != null) {
+      setState(() => _isUploadingBanner = true);
+      try {
+        final uploadedUrl =
+            await context.read<AdminBloc>().repo.uploadTournamentBanner(_bannerImage!);
+        data['banner_image_url'] = uploadedUrl;
+      } on SocketException {
+        if (!mounted) return;
+        showErrorSnackbar(
+          context,
+          'Upload failed due to network issues. Please check your connection.',
+        );
+        return;
+      } catch (e) {
+        if (!mounted) return;
+        showErrorSnackbar(context, e.toString());
+        return;
+      } finally {
+        if (mounted) {
+          setState(() => _isUploadingBanner = false);
+        }
+      }
+    } else if (isEdit && _existingBannerUrl != null && _existingBannerUrl!.isNotEmpty) {
+      data['banner_image_url'] = _existingBannerUrl!;
+    }
 
     if (isEdit) {
       context.read<AdminBloc>().add(AdminTournamentUpdateRequested(widget.tournamentId!, data));
@@ -231,7 +302,7 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
         }
       },
       builder: (context, state) {
-        final _isSaving = state is AdminOperationInProgress;
+        final _isSaving = state is AdminOperationInProgress || _isUploadingBanner;
         if (_isLoadingExisting) {
           return CreamScaffold(
             appBar: AppBar(title: Text('Loading...', style: AppTypography.titleLarge)),
@@ -263,8 +334,16 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
             const SizedBox(height: 8),
             ImageUploadWidget(
               currentImage: _bannerImage,
+              currentImageUrl: _existingBannerUrl,
               onPickImage: _pickBannerImage,
             ),
+            if (_bannerError != null) ...[
+              const SizedBox(height: 6),
+              Text(
+                _bannerError!,
+                style: AppTypography.caption.copyWith(color: AppColors.error),
+              ),
+            ],
             const SizedBox(height: 20),
 
             // ── Basic info ───────────────────────────────────────────
@@ -425,11 +504,12 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
 
 // ─── ImageUploadWidget ────────────────────────────────────────────────────────
 class ImageUploadWidget extends StatelessWidget {
-  final File? currentImage;
+  final XFile? currentImage;
+  final String? currentImageUrl;
   final VoidCallback onPickImage;
 
   const ImageUploadWidget(
-      {super.key, this.currentImage, required this.onPickImage});
+      {super.key, this.currentImage, this.currentImageUrl, required this.onPickImage});
 
   @override
   Widget build(BuildContext context) {
@@ -451,7 +531,9 @@ class ImageUploadWidget extends StatelessWidget {
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
-                    Image.file(currentImage!, fit: BoxFit.cover),
+                    kIsWeb
+                        ? Image.network(currentImage!.path, fit: BoxFit.cover)
+                        : Image.file(File(currentImage!.path), fit: BoxFit.cover),
                     Positioned(
                       top: 8,
                       right: 8,
@@ -468,18 +550,51 @@ class ImageUploadWidget extends StatelessWidget {
                   ],
                 ),
               )
-            : Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.add_photo_alternate_outlined,
-                      color: AppColors.primaryBrand, size: 40),
-                  const SizedBox(height: 8),
-                  Text('Tap to add banner image',
-                      style: AppTypography.bodySmall
-                          .copyWith(color: AppColors.primaryBrand)),
-                  Text('Recommended: 1200×400px',
-                      style: AppTypography.caption),
-                ],
+            : (currentImageUrl != null && currentImageUrl!.isNotEmpty)
+                ? ClipRRect(
+                    borderRadius: AppTheme.cardRadius,
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        CachedNetworkImage(
+                          imageUrl: currentImageUrl!,
+                          fit: BoxFit.cover,
+                          errorWidget: (_, __, ___) => Container(
+                            color: AppColors.surface,
+                            alignment: Alignment.center,
+                            child: const Icon(
+                              Icons.broken_image_outlined,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ),
+                        Positioned(
+                          top: 8,
+                          right: 8,
+                          child: Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withOpacity(0.55),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.edit_rounded,
+                              color: Colors.white,
+                              size: 16,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+            : ClipRRect(
+                borderRadius: AppTheme.cardRadius,
+                child: Image.asset(
+                  AssetConstants.defaultTournamentBanner,
+                  fit: BoxFit.cover,
+                  width: double.infinity,
+                  height: 160,
+                ),
               ),
       ),
     );

@@ -7,6 +7,7 @@ router.use(authenticate, adminOnly);
 
 router.get('/dashboard', c.getDashboardStats);
 router.get('/tournaments', c.listTournaments);
+router.post('/uploads/tournament-banner', c.uploadTournamentBanner);
 router.get('/tournaments/:id/participants', c.getParticipants);
 router.patch('/participants/:id/status', c.updateParticipantStatus);
 router.post('/tournaments/:id/rounds/:roundId/activate', c.activateRound);

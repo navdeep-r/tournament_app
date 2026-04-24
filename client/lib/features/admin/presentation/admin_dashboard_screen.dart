@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:tournament_app/features/auth/bloc/auth_bloc.dart';
 import 'package:tournament_app/features/admin/bloc/admin_bloc.dart';
 import 'package:tournament_app/core/theme/app_colors.dart';
@@ -10,6 +11,7 @@ import 'package:tournament_app/core/theme/app_typography.dart';
 import 'package:tournament_app/core/theme/app_theme.dart';
 import 'package:tournament_app/shared/widgets/cream_scaffold.dart';
 import 'package:tournament_app/shared/widgets/gold_button.dart';
+import 'package:tournament_app/core/constants/asset_constants.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -229,6 +231,14 @@ class _TournamentsTab extends StatelessWidget {
                 padding: const EdgeInsets.all(16),
                 decoration: AppTheme.cardDecoration,
                 child: Row(children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: _TournamentBannerThumb(
+                      imageUrl:
+                          (t['banner_image_url'] ?? t['banner_url'])?.toString(),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
                   Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Text(t['name'] ?? 'Unnamed', style: AppTypography.labelLarge, maxLines: 1, overflow: TextOverflow.ellipsis),
                     Text(t['starts_at'] != null ? t['starts_at'].toString().split('T')[0] : '', style: AppTypography.caption),
@@ -252,6 +262,32 @@ class _TournamentsTab extends StatelessWidget {
       ]),
     );
   }
+}
+
+class _TournamentBannerThumb extends StatelessWidget {
+  final String? imageUrl;
+  const _TournamentBannerThumb({this.imageUrl});
+
+  @override
+  Widget build(BuildContext context) {
+    if (imageUrl != null && imageUrl!.isNotEmpty) {
+      return CachedNetworkImage(
+        imageUrl: imageUrl!,
+        height: 52,
+        width: 72,
+        fit: BoxFit.cover,
+        errorWidget: (_, __, ___) => _fallback(),
+      );
+    }
+    return _fallback();
+  }
+
+  Widget _fallback() => Image.asset(
+        AssetConstants.defaultTournamentBanner,
+        height: 52,
+        width: 72,
+        fit: BoxFit.cover,
+      );
 }
 
 // ── Live Tab ─────────────────────────────────────────────────────────────────

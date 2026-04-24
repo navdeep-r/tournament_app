@@ -5,6 +5,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/gold_button.dart';
+import '../../../../core/constants/asset_constants.dart';
 import '../../data/models/tournament_model.dart';
 
 // ─── UserStatsBanner ──────────────────────────────────────────────────────────
@@ -154,18 +155,24 @@ class _ActiveTournamentCardState extends State<ActiveTournamentCard>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Banner image
-          if (t.bannerUrl != null)
-            ClipRRect(
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(16)),
-              child: CachedNetworkImage(
-                imageUrl: t.bannerUrl!,
-                height: 160,
-                width: double.infinity,
-                fit: BoxFit.cover,
-                placeholder: (_, __) => _shimmerBox(height: 160),
-              ),
-            ),
+          ClipRRect(
+            borderRadius:
+                const BorderRadius.vertical(top: Radius.circular(16)),
+            child: t.bannerUrl != null
+                ? CachedNetworkImage(
+                    imageUrl: t.bannerUrl!,
+                    height: 160,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                    placeholder: (_, __) => _shimmerBox(height: 160),
+                  )
+                : Image.asset(
+                    AssetConstants.defaultTournamentBanner,
+                    height: 160,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                  ),
+          ),
           Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -256,11 +263,12 @@ class UpcomingTournamentCard extends StatelessWidget {
                       height: 110,
                       width: double.infinity,
                       fit: BoxFit.cover)
-                  : Container(
+                  : Image.asset(
+                      AssetConstants.defaultTournamentBanner,
                       height: 110,
-                      color: AppColors.primaryBrand.withOpacity(0.15),
-                      child: const Icon(Icons.emoji_events_rounded,
-                          color: AppColors.primaryBrand, size: 40)),
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                    ),
             ),
             Padding(
               padding: const EdgeInsets.all(12),
