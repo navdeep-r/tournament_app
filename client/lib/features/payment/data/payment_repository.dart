@@ -4,6 +4,7 @@ import 'package:tournament_app/core/network/api_client.dart';
 import 'package:tournament_app/core/constants/api_constants.dart';
 import 'package:tournament_app/core/constants/payment_constants.dart';
 import 'package:tournament_app/features/payment/data/models/payment_models.dart';
+import 'package:dio/dio.dart';
 
 class PaymentRepository {
   final ApiClient _api;
@@ -75,7 +76,27 @@ class PaymentRepository {
             ? DateTime.parse(data['expires_at'].toString())
             : now.add(const Duration(minutes: 15)),
         status: data['status']?.toString() ?? 'created',
+        queueNumber: (data['queue_number'] as num?)?.toInt(),
+        registeredAt: data['registered_at'] != null
+            ? DateTime.parse(data['registered_at'].toString())
+            : null,
       );
+    } on DioException catch (e) {
+      final payload = e.response?.data;
+      if (payload is Map<String, dynamic>) {
+        final error = payload['error'];
+        if (error is Map<String, dynamic>) {
+          final message = error['message']?.toString();
+          if (message != null && message.isNotEmpty) {
+            throw Exception(message);
+          }
+        }
+        final message = payload['message']?.toString();
+        if (message != null && message.isNotEmpty) {
+          throw Exception(message);
+        }
+      }
+      throw Exception('Failed to register for tournament');
     } catch (e) {
       throw Exception('Failed to register: $e');
     }

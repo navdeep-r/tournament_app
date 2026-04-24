@@ -12,6 +12,8 @@ class PaymentOrder {
   final String? referralCode;
   final DateTime expiresAt;
   final String status;
+  final int? queueNumber;
+  final DateTime? registeredAt;
 
   const PaymentOrder({
     required this.orderId,
@@ -26,6 +28,8 @@ class PaymentOrder {
     this.referralCode,
     required this.expiresAt,
     required this.status,
+    this.queueNumber,
+    this.registeredAt,
   });
 
   double get amountRupees => amountPaise / 100;
@@ -33,6 +37,7 @@ class PaymentOrder {
   double get discountRupees => discountPaise / 100;
   bool get hasDiscount => discountPaise > 0;
   bool get isExpired => DateTime.now().isAfter(expiresAt);
+  bool get isFree => amountPaise <= 0;
 
   factory PaymentOrder.fromJson(Map<String, dynamic> json) => PaymentOrder(
         orderId: json['order_id'] as String,
@@ -47,6 +52,10 @@ class PaymentOrder {
         referralCode: json['referral_code'] as String?,
         expiresAt: DateTime.parse(json['expires_at'] as String),
         status: json['status'] as String,
+        queueNumber: (json['queue_number'] as num?)?.toInt(),
+        registeredAt: json['registered_at'] != null
+            ? DateTime.parse(json['registered_at'] as String)
+            : null,
       );
 }
 

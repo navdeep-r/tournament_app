@@ -39,7 +39,7 @@ class TournamentModel {
   bool get isCompleted => status == 'completed' || status == 'cancelled';
   int get spotsLeft => maxParticipants - registeredCount;
   double get entryFeeRupees => entryFeePaise / 100;
-  String get entryFeeFormatted => '₹${entryFeeRupees.toStringAsFixed(0)}';
+  String get entryFeeFormatted => '₹${entryFeeRupees.toStringAsFixed(2)}';
 
   factory TournamentModel.fromJson(Map<String, dynamic> json) =>
       TournamentModel(

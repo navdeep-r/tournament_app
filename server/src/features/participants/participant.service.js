@@ -54,7 +54,8 @@ class ParticipantService {
     const tournament = await this.tournamentRepo.findById(tournamentId);
     if (!tournament) throw new NotFoundError('Tournament not found');
 
-    if (!['registration_open', 'upcoming'].includes(tournament.status)) {
+    const registrationStatus = tournament.effective_status || tournament.status;
+    if (!['registration_open', 'upcoming'].includes(registrationStatus)) {
       throw new BadRequestError('Registration is not open for this tournament');
     }
 

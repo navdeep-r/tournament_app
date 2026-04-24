@@ -57,7 +57,8 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
         _nameController.text = data['name'] ?? '';
         _descController.text = data['description'] ?? '';
         _maxParticipantsController.text = '${data['max_participants'] ?? 500}';
-        _entryFeeController.text = '${data['entry_fee_paise'] ?? 0}';
+        final entryFeePaise = (data['entry_fee_paise'] as num?)?.toInt() ?? 0;
+        _entryFeeController.text = (entryFeePaise / 100).toStringAsFixed(2);
         _rulesController.text = data['rules'] ?? '';
         if (data['starts_at'] != null) {
           _startDateTime = DateTime.tryParse(data['starts_at']);
@@ -193,7 +194,9 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
       'name': _nameController.text.trim(),
       'description': _descController.text.trim(),
       'max_participants': int.tryParse(_maxParticipantsController.text.trim()) ?? 500,
-      'entry_fee_paise': int.tryParse(_entryFeeController.text.trim()) ?? 0,
+      // UI captures rupees; backend expects paise.
+      'entry_fee_paise':
+          ((double.tryParse(_entryFeeController.text.trim()) ?? 0) * 100).round(),
       'rules': _rulesController.text.trim(),
       'starts_at': _startDateTime!.toIso8601String(),
     };
@@ -326,11 +329,18 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
                   child: _Field(
                     controller: _entryFeeController,
                     label: 'Entry Fee (₹)',
-                    hint: '200',
-                    keyboardType: TextInputType.number,
-                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                    validator: (v) =>
-                        (int.tryParse(v ?? '') ?? 0) >= 0 ? null : 'Required',
+                    hint: '200.00',
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+                    ],
+                    validator: (v) {
+                      final parsed = double.tryParse((v ?? '').trim());
+                      if (parsed == null) return 'Required';
+                      if (parsed < 0) return 'Cannot be negative';
+                      return null;
+                    },
                   ),
                 ),
               ],

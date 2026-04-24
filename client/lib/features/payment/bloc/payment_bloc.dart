@@ -165,9 +165,9 @@ class PaymentState {
       );
 
   String get formattedFinalAmount =>
-      '₹${(finalAmountPaise / 100).toStringAsFixed(0)}';
+      '₹${(finalAmountPaise / 100).toStringAsFixed(2)}';
   String get formattedOriginalAmount =>
-      '₹${(originalAmountPaise / 100).toStringAsFixed(0)}';
+      '₹${(originalAmountPaise / 100).toStringAsFixed(2)}';
 }
 
 // ── BLoC ──────────────────────────────────────────────────────────────────────
@@ -185,7 +185,9 @@ class PaymentBloc extends Bloc<PaymentEvent, PaymentState> {
     on<PaymentPhoneChanged>(_onPhoneChanged);
     on<PaymentPhoneSubmitted>(_onPhoneSubmitted);
     on<PaymentSendOtpRequested>(_onSendOtp);
+    on<PaymentOtpChanged>(_onOtpChanged);
     on<PaymentOtpVerified>(_onOtpVerified);
+    on<PaymentReferralCodeChanged>(_onReferralCodeChanged);
     on<PaymentReferralSubmitted>(_onReferralSubmitted);
     on<PaymentReferralRemoved>(_onReferralRemoved);
     on<PaymentMethodSelected>(_onMethodSelected);
@@ -244,9 +246,23 @@ class PaymentBloc extends Bloc<PaymentEvent, PaymentState> {
     }
   }
 
+  void _onOtpChanged(
+      PaymentOtpChanged event, Emitter<PaymentState> emit) {
+    emit(state.copyWith(otp: event.otp, errorMessage: null));
+  }
+
   void _onOtpVerified(
       PaymentOtpVerified event, Emitter<PaymentState> emit) {
     emit(state.copyWith(isPhoneVerified: true, currentStep: 1));
+  }
+
+  void _onReferralCodeChanged(
+      PaymentReferralCodeChanged event, Emitter<PaymentState> emit) {
+    emit(state.copyWith(
+      referralCode: event.code.trim().toUpperCase(),
+      referralError: null,
+      errorMessage: null,
+    ));
   }
 
   Future<void> _onReferralSubmitted(
@@ -312,6 +328,29 @@ class PaymentBloc extends Bloc<PaymentEvent, PaymentState> {
         userPhone: '+91${state.phone}',
         referralCode: state.appliedReferral?.code,
       );
+
+      if (order.isFree) {
+        final freeSuccess = PaymentSuccess(
+          razorpayPaymentId: order.orderId,
+          razorpayOrderId: order.orderId,
+          razorpaySignature: 'FREE_REGISTRATION',
+          userPhone: '+91${state.phone}',
+          amountPaisePaid: order.amountPaise,
+          tournamentId: order.tournamentId,
+          queueNumber: order.queueNumber ?? 0,
+          paidAt: order.registeredAt ?? DateTime.now(),
+        );
+        emit(state.copyWith(
+          currentOrder: order,
+          originalAmountPaise: order.originalAmountPaise,
+          discountAmountPaise: order.discountPaise,
+          finalAmountPaise: order.amountPaise,
+          status: PaymentStatus.success,
+          result: freeSuccess,
+        ));
+        return;
+      }
+
       emit(state.copyWith(
         currentOrder: order,
         originalAmountPaise: order.originalAmountPaise,
@@ -321,9 +360,13 @@ class PaymentBloc extends Bloc<PaymentEvent, PaymentState> {
         status: PaymentStatus.idle,
       ));
     } catch (e) {
-      final message = e.toString().toLowerCase().contains('referral')
+      final raw = e.toString();
+      final cleaned = raw.startsWith('Exception: ')
+          ? raw.substring('Exception: '.length)
+          : raw;
+      final message = cleaned.toLowerCase().contains('referral')
           ? 'Invalid or non-existent referral code'
-          : 'Failed to create order. Please try again.';
+          : cleaned;
       emit(state.copyWith(
         status: PaymentStatus.idle,
         referralError: message,

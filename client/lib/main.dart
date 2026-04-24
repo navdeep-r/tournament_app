@@ -68,10 +68,7 @@ final _router = GoRouter(
       path: '/tournament/:id/checkout',
       builder: (_, state) {
         final id = state.pathParameters['id']!;
-        return BlocProvider(
-          create: (_) => PaymentBloc(_paymentRepo),
-          child: CheckoutScreen(tournamentId: id),
-        );
+        return CheckoutScreen(tournamentId: id);
       },
     ),
     GoRoute(path: '/payment/success', builder: (_, __) => const PaymentSuccessScreen()),
@@ -128,8 +125,15 @@ class TournamentHubApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      create: (_) => AuthBloc(AuthRepository(_api))..add(AuthCheckRequested()),
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider(
+          create: (_) => AuthBloc(AuthRepository(_api))..add(AuthCheckRequested()),
+        ),
+        BlocProvider(
+          create: (_) => PaymentBloc(_paymentRepo),
+        ),
+      ],
       child: MaterialApp.router(
         title: 'Tournament Hub',
         theme: AppTheme.lightTheme,

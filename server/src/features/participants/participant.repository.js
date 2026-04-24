@@ -49,22 +49,51 @@ class ParticipantRepository {
     { tournamentId, userId, phone, referralCode, discountPercent = 0, discountAmountPaise = 0, amountPaidPaise = 0 },
     client
   ) {
+    // Serialize registrations per tournament to avoid duplicate queue numbers.
+    await client.query(
+      'SELECT id FROM tournaments WHERE id=$1 FOR UPDATE',
+      [tournamentId]
+    );
+
     const qResult = await client.query(
-      'SELECT COALESCE(MAX(queue_number), 0) + 1 AS next FROM participants WHERE tournament_id=$1 FOR UPDATE',
+      'SELECT COALESCE(MAX(queue_number), 0) + 1 AS next FROM participants WHERE tournament_id=$1',
       [tournamentId]
     );
     const queueNumber = qResult.rows[0].next;
 
-    const { rows } = await client.query(
-      `INSERT INTO participants (
-         tournament_id, user_id, phone, queue_number, status,
-         referral_code, discount_percent, discount_amount_paise, amount_paid_paise
-       )
-       VALUES ($1, $2, $3, $4, 'registered', $5, $6, $7, $8)
-       RETURNING *`,
-      [tournamentId, userId, phone, queueNumber, referralCode || null, discountPercent, discountAmountPaise, amountPaidPaise]
-    );
-    return rows[0];
+    try {
+      const { rows } = await client.query(
+        `INSERT INTO participants (
+           tournament_id, user_id, phone, queue_number, status,
+           referral_code, discount_percent, discount_amount_paise, amount_paid_paise
+         )
+         VALUES ($1, $2, $3, $4, 'registered', $5, $6, $7, $8)
+         RETURNING *`,
+        [
+          tournamentId,
+          userId,
+          phone,
+          queueNumber,
+          referralCode || null,
+          discountPercent,
+          discountAmountPaise,
+          amountPaidPaise,
+        ]
+      );
+      return rows[0];
+    } catch (err) {
+      // Compatibility fallback for DBs where referral columns are not migrated yet.
+      if (err?.code !== '42703') throw err;
+      const { rows } = await client.query(
+        `INSERT INTO participants (
+           tournament_id, user_id, phone, queue_number, status
+         )
+         VALUES ($1, $2, $3, $4, 'registered')
+         RETURNING *`,
+        [tournamentId, userId, phone, queueNumber]
+      );
+      return rows[0];
+    }
   }
 
   async findById(id) {

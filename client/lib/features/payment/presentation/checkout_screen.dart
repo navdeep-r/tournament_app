@@ -502,12 +502,12 @@ class _PriceBreakdownCard extends StatelessWidget {
         ),
         child: Column(
           children: [
-            _Row('Original', '₹${(original / 100).toStringAsFixed(0)}'),
+            _Row('Original', '₹${(original / 100).toStringAsFixed(2)}'),
             const SizedBox(height: 6),
-            _Row('Discount ($code)', '-₹${(discount / 100).toStringAsFixed(0)}',
+            _Row('Discount ($code)', '-₹${(discount / 100).toStringAsFixed(2)}',
                 valueColor: AppColors.success),
             const Divider(height: 20),
-            _Row('Total', '₹${(final_ / 100).toStringAsFixed(0)}',
+            _Row('Total', '₹${(final_ / 100).toStringAsFixed(2)}',
                 bold: true),
           ],
         ),
@@ -641,7 +641,7 @@ class _OrderSummaryCard extends StatelessWidget {
                     size: 14, color: AppColors.success),
                 const SizedBox(width: 4),
                 Text(
-                    'Saved ₹${(state.discountAmountPaise / 100).toStringAsFixed(0)}',
+                  'Saved ₹${(state.discountAmountPaise / 100).toStringAsFixed(2)}',
                     style: AppTypography.caption
                         .copyWith(color: AppColors.success)),
               ],
