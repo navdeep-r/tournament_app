@@ -1,4 +1,5 @@
 const { BadRequestError } = require('../../core/errors/HttpErrors');
+const { buildEffectiveTournamentStatusSql } = require('../../core/sql/tournamentStatus');
 
 class TournamentRepository {
   constructor({ query, withTransaction }) {
@@ -7,8 +8,10 @@ class TournamentRepository {
   }
 
   async findById(id) {
+    const effectiveStatusSql = buildEffectiveTournamentStatusSql('t');
     const { rows } = await this.query(
-      `SELECT t.*, u.name AS winner_name
+      `SELECT t.*, u.name AS winner_name,
+              ${effectiveStatusSql} AS effective_status
        FROM tournaments t
        LEFT JOIN users u ON u.id = t.winner_user_id
        WHERE t.id = $1`,
@@ -18,13 +21,14 @@ class TournamentRepository {
   }
 
   async findAll({ status, search, page = 1, limit = 20 }) {
+    const effectiveStatusSql = buildEffectiveTournamentStatusSql('t');
     const conditions = [];
     const values = [];
     let idx = 1;
 
     if (status) {
       const statuses = Array.isArray(status) ? status : [status];
-      conditions.push(`t.status = ANY($${idx++})`);
+      conditions.push(`(${effectiveStatusSql}) = ANY($${idx++})`);
       values.push(statuses);
     }
     if (search) {
@@ -42,7 +46,8 @@ class TournamentRepository {
     const total = parseInt(countResult.rows[0].count);
 
     const { rows } = await this.query(
-      `SELECT t.*, u.name AS winner_name
+      `SELECT t.*, u.name AS winner_name,
+              ${effectiveStatusSql} AS effective_status
        FROM tournaments t
        LEFT JOIN users u ON u.id = t.winner_user_id
        ${where}

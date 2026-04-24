@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -19,11 +21,22 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _currentTab = 0;
+  Timer? _refreshTimer;
 
   @override
   void initState() {
     super.initState();
     context.read<HomeBloc>().add(HomeLoadRequested());
+    _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (!mounted) return;
+      context.read<HomeBloc>().add(HomeRefreshRequested());
+    });
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    super.dispose();
   }
 
   @override
@@ -123,7 +136,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
           // Active tournaments
           if (state.activeToday.isNotEmpty) ...[
-            _SectionHeader(title: 'Active Tournaments'),
+            _SectionHeader(title: 'Live Board'),
             const SizedBox(height: 12),
             ...state.activeToday.map((t) => Padding(
                   padding: const EdgeInsets.only(bottom: 12),

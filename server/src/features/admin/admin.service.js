@@ -1,5 +1,6 @@
 const { BadRequestError, NotFoundError } = require('../../core/errors/HttpErrors');
 const { getPagination, getPaginationMeta } = require('../../core/utils/pagination');
+const { buildEffectiveTournamentStatusSql } = require('../../core/sql/tournamentStatus');
 
 const VALID_STATUSES = ['registered', 'active', 'eliminated', 'winner', 'no_show', 'disqualified'];
 
@@ -11,11 +12,20 @@ class AdminService {
   }
 
   async getDashboardStats() {
+    const effectiveStatusSql = buildEffectiveTournamentStatusSql('t');
     const [users, active, today, live, eliminated] = await Promise.all([
       this.query("SELECT COUNT(*) FROM users WHERE is_active=TRUE"),
-      this.query("SELECT COUNT(*) FROM tournaments WHERE status IN ('upcoming','registration_open','live')"),
+      this.query(
+        `SELECT COUNT(*)
+         FROM tournaments t
+         WHERE (${effectiveStatusSql}) IN ('upcoming','registration_open','registration_closed','live')`
+      ),
       this.query("SELECT COUNT(*) FROM participants WHERE DATE(registered_at) = CURRENT_DATE"),
-      this.query("SELECT COUNT(*) FROM tournaments WHERE status='live'"),
+      this.query(
+        `SELECT COUNT(*)
+         FROM tournaments t
+         WHERE (${effectiveStatusSql})='live'`
+      ),
       this.query("SELECT COUNT(*) FROM participants WHERE status='eliminated' AND DATE(updated_at) = CURRENT_DATE"),
     ]);
 
@@ -218,9 +228,11 @@ class AdminService {
 
   async listTournaments(queryParams) {
     const { limit, offset, page } = getPagination(queryParams);
+    const effectiveStatusSql = buildEffectiveTournamentStatusSql('t');
     const { rows } = await this.query(
       `SELECT t.*, u.name AS creator_name,
-              (SELECT COUNT(*) FROM participants WHERE tournament_id=t.id) AS participant_count
+              (SELECT COUNT(*) FROM participants WHERE tournament_id=t.id) AS participant_count,
+              ${effectiveStatusSql} AS effective_status
        FROM tournaments t
        LEFT JOIN users u ON u.id = t.created_by
        ORDER BY t.created_at DESC
@@ -229,7 +241,11 @@ class AdminService {
     );
     const countResult = await this.query('SELECT COUNT(*) FROM tournaments');
     const total = parseInt(countResult.rows[0].count);
-    return { rows, meta: getPaginationMeta(total, page, limit) };
+    const normalizedRows = rows.map(({ effective_status, ...rest }) => ({
+      ...rest,
+      status: effective_status || rest.status,
+    }));
+    return { rows: normalizedRows, meta: getPaginationMeta(total, page, limit) };
   }
 }
 

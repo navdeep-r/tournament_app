@@ -14,15 +14,23 @@ class TournamentService {
     this.tournamentRepo = tournamentRepo;
   }
 
+  _withEffectiveStatus(tournament) {
+    if (!tournament) return tournament;
+    if (!tournament.effective_status) return tournament;
+    const { effective_status, ...rest } = tournament;
+    return { ...rest, status: effective_status };
+  }
+
   async list(queryParams) {
     const { limit, offset, page } = getPagination(queryParams);
     const { status, search } = queryParams;
     const { rows, total } = await this.tournamentRepo.findAll({ status, search, page, limit });
-    return { tournaments: rows, meta: getPaginationMeta(total, page, limit) };
+    return { tournaments: rows.map((row) => this._withEffectiveStatus(row)), meta: getPaginationMeta(total, page, limit) };
   }
 
   async getById(id) {
-    const tournament = await this.tournamentRepo.findById(id);
+    const rawTournament = await this.tournamentRepo.findById(id);
+    const tournament = this._withEffectiveStatus(rawTournament);
     if (!tournament) throw new NotFoundError('Tournament not found');
     const rounds = await this.tournamentRepo.getRoundsForTournament(id);
     return {
@@ -57,10 +65,11 @@ class TournamentService {
     const tournament = await this.tournamentRepo.findById(id);
     if (!tournament) throw new NotFoundError('Tournament not found');
 
-    const allowed = VALID_TRANSITIONS[tournament.status] || [];
+    const currentStatus = tournament.effective_status || tournament.status;
+    const allowed = VALID_TRANSITIONS[currentStatus] || [];
     if (!allowed.includes(newStatus)) {
       throw new BadRequestError(
-        `Cannot transition from '${tournament.status}' to '${newStatus}'. Allowed: ${allowed.join(', ') || 'none'}`
+        `Cannot transition from '${currentStatus}' to '${newStatus}'. Allowed: ${allowed.join(', ') || 'none'}`
       );
     }
     return this.tournamentRepo.update(id, { status: newStatus });
@@ -69,7 +78,8 @@ class TournamentService {
   async delete(id) {
     const tournament = await this.tournamentRepo.findById(id);
     if (!tournament) throw new NotFoundError('Tournament not found');
-    if (['live', 'completed'].includes(tournament.status)) {
+    const currentStatus = tournament.effective_status || tournament.status;
+    if (['live', 'completed'].includes(currentStatus)) {
       throw new BadRequestError('Cannot delete active or completed tournament');
     }
     return this.tournamentRepo.update(id, { status: 'cancelled' });

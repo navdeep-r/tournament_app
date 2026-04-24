@@ -1,6 +1,7 @@
 const cron = require('node-cron');
 const db = require('../config/db');
 const logger = require('../core/utils/logger');
+const { buildEffectiveTournamentStatusSql } = require('../core/sql/tournamentStatus');
 
 const openRegistrations = async () => {
   try {
@@ -38,6 +39,26 @@ const closeRegistrations = async () => {
   }
 };
 
+const syncTournamentStatuses = async () => {
+  try {
+    const effectiveStatusSql = buildEffectiveTournamentStatusSql('t');
+    const { rows } = await db.query(
+      `UPDATE tournaments t
+       SET status = (${effectiveStatusSql}), updated_at = NOW()
+       WHERE t.status <> (${effectiveStatusSql})
+         AND t.status <> 'cancelled'
+       RETURNING id, name, status`
+    );
+    if (rows.length > 0) {
+      logger.info('Auto-synced tournament statuses', {
+        tournaments: rows.map((r) => ({ name: r.name, status: r.status })),
+      });
+    }
+  } catch (err) {
+    logger.error('Job error: syncTournamentStatuses', { err: err.message });
+  }
+};
+
 const startJobs = () => {
   // Open registration check — every minute
   cron.schedule('* * * * *', () => {
@@ -52,6 +73,14 @@ const startJobs = () => {
       closeRegistrations();
     });
   }, 30000);
+
+  // Status sync check — every minute, staggered 45s.
+  setTimeout(() => {
+    cron.schedule('* * * * *', () => {
+      logger.debug('Running job: syncTournamentStatuses');
+      syncTournamentStatuses();
+    });
+  }, 45000);
 
   logger.info('Background jobs started');
 };
